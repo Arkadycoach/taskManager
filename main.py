@@ -30,10 +30,15 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 
 # ★ Твой Telegram user_id — уведомления будут приходить ТОЛЬКО тебе
 # Узнать можно написав @userinfobot
-MY_TELEGRAM_ID = int(os.getenv("@ALKrementsov", "0"))
+MY_TELEGRAM_ID = int(os.getenv("MY_TELEGRAM_ID", "0"))
 
 SHEET_NAME     = "Tasks"
-LOG_SHEET_NAME = "ChangeLog"
+LOG_SHEET_NAME  = "ChangeLog"
+SUBTASKS_SHEET  = "Subtasks"
+COMMENTS_SHEET  = "Comments"
+
+SUB_COLS = ["SubID","ParentID","Название","Статус","Создано","Обновлено"]
+COM_COLS = ["CommentID","TaskID","UserID","Имя","Текст","Создано"]
 SETTINGS_SHEET = "⚙️ Настройки"
 
 SCOPES = [
@@ -145,6 +150,19 @@ class TaskUpdate(BaseModel):
     status: Optional[str] = None; priority: Optional[str] = None
     deadline: Optional[str] = None; assignee: Optional[str] = None
     user_id: str = ""; user_name: str = ""
+
+class SubtaskCreate(BaseModel):
+    title: str
+    user_id: str = ""
+
+class SubtaskUpdate(BaseModel):
+    title: Optional[str] = None
+    status: Optional[str] = None   # "todo" | "done"
+
+class CommentCreate(BaseModel):
+    text: str
+    user_id: str = ""
+    user_name: str = ""
 
 # ══════════════════════════════════════════════════════
 # FASTAPI
@@ -269,6 +287,131 @@ async def admin_setup_sheet():
 @app.get("/health")
 async def health():
     return {"status": "ok", "time": datetime.now().isoformat()}
+
+
+# ══════════════════════════════════════════════════════
+# SUBTASKS
+# ══════════════════════════════════════════════════════
+def _get_sub_sheet():
+    sp = get_sheets_client().open_by_key(SHEET_ID)
+    try:
+        return sp.worksheet(SUBTASKS_SHEET)
+    except gspread.WorksheetNotFound:
+        s = sp.add_worksheet(title=SUBTASKS_SHEET, rows=2000, cols=len(SUB_COLS))
+        s.append_row(SUB_COLS)
+        return s
+
+def _get_com_sheet():
+    sp = get_sheets_client().open_by_key(SHEET_ID)
+    try:
+        return sp.worksheet(COMMENTS_SHEET)
+    except gspread.WorksheetNotFound:
+        s = sp.add_worksheet(title=COMMENTS_SHEET, rows=5000, cols=len(COM_COLS))
+        s.append_row(COM_COLS)
+        return s
+
+@app.get("/tasks/{task_id}/subtasks")
+async def get_subtasks(task_id: str):
+    try:
+        sheet = _get_sub_sheet()
+        rows  = sheet.get_all_values()
+        subs  = []
+        for row in rows[1:]:
+            if len(row) > 1 and row[1] == task_id and row[0]:
+                subs.append({"id":row[0],"parent_id":row[1],"title":row[2],
+                             "status":row[3],"created_at":row[4]})
+        return {"subtasks": subs}
+    except Exception as e:
+        logger.error(f"get_subtasks: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/tasks/{task_id}/subtasks")
+async def create_subtask(task_id: str, sub: SubtaskCreate):
+    try:
+        sheet = _get_sub_sheet()
+        sid   = str(uuid.uuid4())[:8].upper()
+        now   = datetime.now().isoformat(timespec="seconds")
+        sheet.append_row([sid, task_id, sub.title, "todo", now, now])
+        return {"subtask":{"id":sid,"parent_id":task_id,"title":sub.title,"status":"todo","created_at":now}}
+    except Exception as e:
+        logger.error(f"create_subtask: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.patch("/subtasks/{sub_id}")
+async def update_subtask(sub_id: str, upd: SubtaskUpdate):
+    try:
+        sheet = _get_sub_sheet()
+        rows  = sheet.get_all_values()
+        for i, row in enumerate(rows[1:], start=2):
+            if row and row[0] == sub_id:
+                if upd.title  is not None: sheet.update_cell(i, 3, upd.title)
+                if upd.status is not None: sheet.update_cell(i, 4, upd.status)
+                sheet.update_cell(i, 6, datetime.now().isoformat(timespec="seconds"))
+                return {"success": True}
+        raise HTTPException(status_code=404, detail="Subtask not found")
+    except HTTPException: raise
+    except Exception as e:
+        logger.error(f"update_subtask: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/subtasks/{sub_id}")
+async def delete_subtask(sub_id: str):
+    try:
+        sheet = _get_sub_sheet()
+        rows  = sheet.get_all_values()
+        for i, row in enumerate(rows[1:], start=2):
+            if row and row[0] == sub_id:
+                sheet.delete_rows(i)
+                return {"success": True}
+        raise HTTPException(status_code=404, detail="Subtask not found")
+    except HTTPException: raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ══════════════════════════════════════════════════════
+# COMMENTS
+# ══════════════════════════════════════════════════════
+@app.get("/tasks/{task_id}/comments")
+async def get_comments(task_id: str):
+    try:
+        sheet = _get_com_sheet()
+        rows  = sheet.get_all_values()
+        coms  = []
+        for row in rows[1:]:
+            if len(row) > 1 and row[1] == task_id and row[0]:
+                coms.append({"id":row[0],"task_id":row[1],"user_id":row[2],
+                             "user_name":row[3],"text":row[4],"created_at":row[5]})
+        return {"comments": coms}
+    except Exception as e:
+        logger.error(f"get_comments: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/tasks/{task_id}/comments")
+async def create_comment(task_id: str, com: CommentCreate):
+    try:
+        sheet = _get_com_sheet()
+        cid   = str(uuid.uuid4())[:8].upper()
+        now   = datetime.now().isoformat(timespec="seconds")
+        sheet.append_row([cid, task_id, com.user_id, com.user_name, com.text, now])
+        return {"comment":{"id":cid,"task_id":task_id,"user_id":com.user_id,
+                           "user_name":com.user_name,"text":com.text,"created_at":now}}
+    except Exception as e:
+        logger.error(f"create_comment: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/comments/{comment_id}")
+async def delete_comment(comment_id: str):
+    try:
+        sheet = _get_com_sheet()
+        rows  = sheet.get_all_values()
+        for i, row in enumerate(rows[1:], start=2):
+            if row and row[0] == comment_id:
+                sheet.delete_rows(i)
+                return {"success": True}
+        raise HTTPException(status_code=404, detail="Comment not found")
+    except HTTPException: raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ══════════════════════════════════════════════════════
 # УВЕДОМЛЕНИЯ
