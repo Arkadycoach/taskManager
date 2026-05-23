@@ -30,7 +30,7 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 
 # ★ Твой Telegram user_id — уведомления будут приходить ТОЛЬКО тебе
 # Узнать можно написав @userinfobot
-MY_TELEGRAM_ID = int(os.getenv("MY_TELEGRAM_ID", "0"))
+MY_TELEGRAM_ID = int(os.getenv("@ALKrementsov", "0"))
 
 SHEET_NAME     = "Tasks"
 LOG_SHEET_NAME = "ChangeLog"
