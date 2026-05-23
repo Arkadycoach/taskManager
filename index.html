@@ -1007,9 +1007,437 @@
       .modal-overlay { align-items: center; justify-content: center; }
       .qa-sheet { border-radius: 22px; max-width: 480px; margin: 0 auto; }
     }
+
+    /* ══════════════════════════════════════════════════
+       SIDEBAR — Linear / Notion style drawer
+    ══════════════════════════════════════════════════ */
+
+    /* Backdrop */
+    .sb-overlay {
+      position: fixed; inset: 0;
+      background: rgba(17,24,39,.32);
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+      z-index: 200;
+      opacity: 0; pointer-events: none;
+      transition: opacity .26s;
+    }
+    .sb-overlay.open { opacity: 1; pointer-events: all; }
+
+    /* Drawer */
+    .sidebar {
+      position: fixed; top: 0; left: 0; bottom: 0;
+      width: 282px;
+      background: #FAFBFF;
+      z-index: 201;
+      transform: translateX(-100%);
+      transition: transform .34s cubic-bezier(.16,1,.3,1);
+      display: flex; flex-direction: column;
+      overflow: hidden;
+      box-shadow: 8px 0 48px rgba(17,24,39,.14);
+      border-right: 1px solid var(--border);
+    }
+    .sb-overlay.open .sidebar { transform: translateX(0); }
+
+    /* ── Sidebar Header ── */
+    .sb-head {
+      padding: 18px 16px 14px;
+      display: flex; align-items: center; gap: 12px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .sb-app-icon {
+      width: 36px; height: 36px; border-radius: 11px;
+      background: linear-gradient(135deg, #1B2F6E, #3B5BDB);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 17px; flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(59,91,219,.30);
+    }
+    .sb-app-meta { flex: 1; min-width: 0; }
+    .sb-app-name {
+      font-size: 15px; font-weight: 800; color: var(--text);
+      letter-spacing: -.02em; line-height: 1.2;
+    }
+    .sb-user-name {
+      font-size: 11px; color: var(--muted); font-weight: 500;
+      margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .sb-close {
+      width: 28px; height: 28px; border-radius: 8px;
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--muted); font-size: 13px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all var(--fast); flex-shrink: 0;
+    }
+    .sb-close:active { background: var(--border2); }
+
+    /* ── Stats bar ── */
+    .sb-stats-bar {
+      display: flex; align-items: center;
+      padding: 12px 18px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      gap: 0; flex-shrink: 0;
+    }
+    .sb-stat { flex: 1; text-align: center; }
+    .sb-stat-n {
+      display: block; font-size: 20px; font-weight: 800;
+      color: var(--text); letter-spacing: -.04em; line-height: 1;
+    }
+    .sb-stat-l {
+      display: block; font-size: 9px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .06em;
+      color: var(--muted2); margin-top: 4px;
+    }
+    .sb-stat-sep {
+      width: 1px; height: 30px; background: var(--border); flex-shrink: 0;
+      margin: 0 4px;
+    }
+
+    /* ── Scrollable nav body ── */
+    .sb-body {
+      flex: 1; overflow-y: auto; overflow-x: hidden;
+      padding: 6px 0 8px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    .sb-body::-webkit-scrollbar { width: 4px; }
+    .sb-body::-webkit-scrollbar-track { background: transparent; }
+    .sb-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* ── Section wrapper ── */
+    .sb-section { padding: 4px 0 2px; }
+
+    .sb-section-header {
+      display: flex; align-items: center;
+      padding: 6px 10px 5px 20px;
+      cursor: pointer; user-select: none;
+      border-radius: 0;
+      transition: background var(--fast);
+    }
+    .sb-section-header:active { background: var(--surface2); }
+    .sb-section-title {
+      flex: 1;
+      font-size: 10px; font-weight: 800;
+      letter-spacing: .08em; text-transform: uppercase;
+      color: var(--muted2);
+    }
+    .sb-chevron {
+      width: 18px; height: 18px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--muted2); font-size: 10px;
+      transition: transform .22s var(--ease);
+      flex-shrink: 0;
+    }
+    .sb-section.collapsed .sb-chevron { transform: rotate(-90deg); }
+
+    .sb-section-body {
+      overflow: hidden;
+      max-height: 600px; opacity: 1;
+      transition: max-height .3s var(--ease), opacity .22s;
+    }
+    .sb-section.collapsed .sb-section-body { max-height: 0; opacity: 0; }
+
+    /* ── Nav items ── */
+    .sb-nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 12px 8px 16px;
+      margin: 1px 8px;
+      border-radius: 9px;
+      cursor: pointer;
+      transition: background var(--fast), color var(--fast);
+      font-size: 13.5px; font-weight: 500;
+      color: var(--text2);
+      position: relative;
+      user-select: none;
+    }
+    .sb-nav-item:hover { background: var(--surface3); }
+    .sb-nav-item:active { background: var(--border); }
+
+    /* Active state */
+    .sb-nav-item.active {
+      background: var(--blue-soft);
+      color: var(--blue);
+      font-weight: 700;
+    }
+    .sb-nav-item.active .sb-icon { color: var(--blue); }
+    .sb-nav-item.active .sb-nav-badge { background: var(--blue-mid); color: var(--blue); }
+
+    /* Icon */
+    .sb-icon {
+      width: 20px; height: 20px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; flex-shrink: 0; color: var(--muted);
+      transition: color var(--fast);
+    }
+    .sb-nav-item:hover .sb-icon { color: var(--text2); }
+
+    /* Label */
+    .sb-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* Count badge */
+    .sb-nav-badge {
+      font-size: 10.5px; font-weight: 700;
+      background: var(--surface3); color: var(--muted);
+      padding: 1px 7px; border-radius: 99px;
+      min-width: 20px; text-align: center;
+      flex-shrink: 0;
+      transition: background var(--fast), color var(--fast);
+    }
+    .sb-nav-badge:empty { display: none; }
+
+    /* Danger badge */
+    .sb-nav-badge.danger { background: var(--red-soft); color: var(--red); }
+    .sb-nav-badge.warn   { background: var(--yel-soft); color: #92400E; }
+
+    /* ── Divider ── */
+    .sb-divider {
+      height: 1px; background: var(--border);
+      margin: 8px 16px;
+    }
+
+    /* ── Add task button ── */
+    .sb-add-btn {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px 9px 16px;
+      margin: 4px 8px;
+      border-radius: 9px;
+      cursor: pointer;
+      transition: background var(--fast);
+      font-size: 13.5px; font-weight: 600;
+      color: var(--blue);
+      border: 1.5px dashed var(--blue-mid);
+      background: transparent;
+      width: calc(100% - 16px);
+    }
+    .sb-add-btn:hover { background: var(--blue-soft); border-style: solid; }
+    .sb-add-btn:active { background: var(--blue-mid); }
+    .sb-add-icon {
+      width: 20px; height: 20px;
+      background: var(--blue); color: #fff;
+      border-radius: 6px; font-size: 16px; font-weight: 400;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+
+    /* ── Sidebar Footer ── */
+    .sb-footer {
+      padding: 12px 16px max(env(safe-area-inset-bottom),14px);
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+      background: var(--surface);
+    }
+    .sb-prog-row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      margin-bottom: 6px;
+    }
+    .sb-prog-lbl { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted2); }
+    .sb-prog-pct { font-size: 12px; font-weight: 800; color: var(--blue); letter-spacing: -.01em; }
+    .sb-prog-track {
+      height: 4px; background: var(--border); border-radius: 99px; overflow: hidden; margin-bottom: 10px;
+    }
+    .sb-prog-fill { height: 100%; background: var(--blue); border-radius: 99px; transition: width .5s var(--ease); }
+    .sb-footer-btns { display: flex; gap: 0; }
+    .sb-footer-btn {
+      flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 8px 6px; border-radius: 8px; cursor: pointer;
+      font-size: 12px; font-weight: 600; color: var(--muted);
+      background: none; border: none; font-family: inherit;
+      transition: background var(--fast), color var(--fast);
+    }
+    .sb-footer-btn:hover { background: var(--surface2); color: var(--text2); }
+    .sb-footer-btn:active { background: var(--border); }
+
+    /* ── Hamburger button in header ── */
+    .sb-hamburger {
+      width: 34px; height: 34px;
+      background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.15);
+      border-radius: 9px; color: rgba(255,255,255,.9);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; font-size: 16px; flex-shrink: 0;
+      transition: background var(--fast);
+    }
+    .sb-hamburger:active { background: rgba(255,255,255,.25); }
+
+    /* Edge swipe zone (invisible, for touch) */
+    .sb-edge-zone {
+      position: fixed; left: 0; top: 0; bottom: 0; width: 18px;
+      z-index: 190;
+    }
+
   </style>
 </head>
 <body>
+
+
+<!-- ══════════════════════════════════════════
+     SIDEBAR DRAWER
+══════════════════════════════════════════ -->
+<div class="sb-overlay" id="sbOverlay" onclick="closeSidebar()">
+  <div class="sidebar" id="sidebar" onclick="event.stopPropagation()">
+
+    <!-- Header -->
+    <div class="sb-head">
+      <div class="sb-app-icon">📋</div>
+      <div class="sb-app-meta">
+        <div class="sb-app-name">Task Manager</div>
+        <div class="sb-user-name" id="sbUserName">Загрузка...</div>
+      </div>
+      <button class="sb-close" onclick="closeSidebar()">✕</button>
+    </div>
+
+    <!-- Stats bar -->
+    <div class="sb-stats-bar">
+      <div class="sb-stat">
+        <span class="sb-stat-n" id="sbStatAll">0</span>
+        <span class="sb-stat-l">Всего</span>
+      </div>
+      <div class="sb-stat-sep"></div>
+      <div class="sb-stat">
+        <span class="sb-stat-n" id="sbStatDoing">0</span>
+        <span class="sb-stat-l">В работе</span>
+      </div>
+      <div class="sb-stat-sep"></div>
+      <div class="sb-stat">
+        <span class="sb-stat-n" id="sbStatOverdue" style="color:var(--red)">0</span>
+        <span class="sb-stat-l" style="color:var(--red)">Просроч.</span>
+      </div>
+    </div>
+
+    <!-- Body -->
+    <div class="sb-body">
+
+      <!-- Add task CTA -->
+      <div style="padding:10px 8px 4px">
+        <button class="sb-add-btn" onclick="closeSidebar();openAddModal()">
+          <span class="sb-add-icon">+</span>
+          <span>Новая задача</span>
+        </button>
+      </div>
+
+      <div class="sb-divider"></div>
+
+      <!-- ── Section: Main ── -->
+      <div class="sb-section" id="sbSec1">
+        <div class="sb-section-header" onclick="toggleSbSection('sbSec1')">
+          <span class="sb-section-title">Задачи</span>
+          <span class="sb-chevron">▾</span>
+        </div>
+        <div class="sb-section-body">
+          <div class="sb-nav-item active" data-filter="all" onclick="sbNav('all',this)">
+            <span class="sb-icon">◈</span>
+            <span class="sb-label">Все активные</span>
+            <span class="sb-nav-badge" id="sbCnt-all"></span>
+          </div>
+          <div class="sb-nav-item" data-filter="doing" onclick="sbNav('doing',this)">
+            <span class="sb-icon" style="color:#F59F00">⚡</span>
+            <span class="sb-label">В работе</span>
+            <span class="sb-nav-badge warn" id="sbCnt-doing"></span>
+          </div>
+          <div class="sb-nav-item" data-filter="todo" onclick="sbNav('todo',this)">
+            <span class="sb-icon" style="color:#748FFC">○</span>
+            <span class="sb-label">Новые</span>
+            <span class="sb-nav-badge" id="sbCnt-todo"></span>
+          </div>
+          <div class="sb-nav-item" data-filter="done" onclick="sbNav('done',this)">
+            <span class="sb-icon" style="color:#40C057">✓</span>
+            <span class="sb-label">Выполненные</span>
+            <span class="sb-nav-badge" id="sbCnt-done"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Section: По дате ── -->
+      <div class="sb-section" id="sbSec2">
+        <div class="sb-section-header" onclick="toggleSbSection('sbSec2')">
+          <span class="sb-section-title">По дате</span>
+          <span class="sb-chevron">▾</span>
+        </div>
+        <div class="sb-section-body">
+          <div class="sb-nav-item" data-filter="today" onclick="sbNav('today',this)">
+            <span class="sb-icon" style="color:#B45309">●</span>
+            <span class="sb-label">Сегодня</span>
+            <span class="sb-nav-badge warn" id="sbCnt-today"></span>
+          </div>
+          <div class="sb-nav-item" data-filter="overdue" onclick="sbNav('overdue',this)">
+            <span class="sb-icon" style="color:var(--red)">⚠</span>
+            <span class="sb-label">Просроченные</span>
+            <span class="sb-nav-badge danger" id="sbCnt-overdue"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Section: Приоритет ── -->
+      <div class="sb-section" id="sbSec3">
+        <div class="sb-section-header" onclick="toggleSbSection('sbSec3')">
+          <span class="sb-section-title">Приоритет</span>
+          <span class="sb-chevron">▾</span>
+        </div>
+        <div class="sb-section-body">
+          <div class="sb-nav-item" data-filter="high" onclick="sbNav('high',this)">
+            <span class="sb-icon" style="color:var(--red)">↑</span>
+            <span class="sb-label">Высокий</span>
+            <span class="sb-nav-badge danger" id="sbCnt-high"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Section: Вид (collapsed by default) ── -->
+      <div class="sb-section collapsed" id="sbSec4">
+        <div class="sb-section-header" onclick="toggleSbSection('sbSec4')">
+          <span class="sb-section-title">Виды</span>
+          <span class="sb-chevron">▾</span>
+        </div>
+        <div class="sb-section-body">
+          <div class="sb-nav-item" onclick="closeSidebar();if(!isKanban)toggleView()">
+            <span class="sb-icon">⊞</span>
+            <span class="sb-label">Канбан-доска</span>
+          </div>
+          <div class="sb-nav-item" onclick="closeSidebar();if(isKanban)toggleView()">
+            <span class="sb-icon">☰</span>
+            <span class="sb-label">Список задач</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sb-divider"></div>
+
+      <!-- ── Actions ── -->
+      <div class="sb-section">
+        <div class="sb-section-body">
+          <div class="sb-nav-item" onclick="closeSidebar();syncData()">
+            <span class="sb-icon">⟳</span>
+            <span class="sb-label">Обновить данные</span>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /sb-body -->
+
+    <!-- Footer with progress -->
+    <div class="sb-footer">
+      <div class="sb-prog-row">
+        <span class="sb-prog-lbl">Прогресс</span>
+        <span class="sb-prog-pct" id="sbPct">0%</span>
+      </div>
+      <div class="sb-prog-track">
+        <div class="sb-prog-fill" id="sbFill" style="width:0%"></div>
+      </div>
+      <div class="sb-footer-btns">
+        <button class="sb-footer-btn" onclick="closeSidebar();setFilter('all',null)">
+          📋 Задачи
+        </button>
+        <button class="sb-footer-btn" onclick="closeSidebar()">
+          ✕ Закрыть
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /sidebar -->
+</div><!-- /sb-overlay -->
+
+<!-- Edge swipe zone -->
+<div class="sb-edge-zone" id="sbEdgeZone"></div>
 
 <div class="loading" id="loading">
   <div class="loading-logo">Task<span>Manager</span></div>
@@ -1022,13 +1450,15 @@
   <!-- HEADER -->
   <div class="header">
     <div class="header-top">
-      <div class="logo">
-        <div class="logo-icon">📋</div>
-        TaskMgr
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="sb-hamburger" onclick="openSidebar()" title="Меню">☰</button>
+        <div class="logo" style="cursor:pointer" onclick="openSidebar()">
+          TaskMgr
+        </div>
       </div>
       <div class="header-right">
         <div class="streak-badge hidden" id="streakBadge">🔥 <span id="streakNum">0</span></div>
-        <button class="icon-btn" id="viewBtn" onclick="toggleView()" title="Переключить вид">⊞</button>
+        <button class="icon-btn" id="viewBtn" onclick="toggleView()" title="Вид">⊞</button>
         <button class="icon-btn" id="syncBtn" onclick="syncData()" title="Обновить">
           <span class="sync-icon">⟳</span>
         </button>
@@ -1704,6 +2134,8 @@ function updateStats() {
   const pct = total ? Math.round(done / total * 100) : 0;
   document.getElementById('progressPct').textContent  = pct + '%';
   document.getElementById('progressFill').style.width = pct + '%';
+  // Keep sidebar counts live
+  if (typeof updateSbCounts === 'function') updateSbCounts();
 }
 
 function animateStat(id, val) {
@@ -1747,6 +2179,7 @@ function setFilter(f, btn) {
     if (b) { b.classList.add('active'); b.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }); }
   }
   document.getElementById('tasksLabel').textContent = FILTER_LABELS[f] || 'Задачи';
+  _syncSbActiveItem(f);
   renderTasks();
 }
 
@@ -1891,7 +2324,7 @@ function escHtml(s) {
 // KEYBOARD SHORTCUTS
 // ══════════════════════════════════════════
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape')  { closeDetail(); closeModal(); closeQA(); }
+  if (e.key === 'Escape')  { closeSidebar(); closeDetail(); closeModal(); closeQA(); }
   if (e.key === 'n' && !document.activeElement.tagName.match(/INPUT|TEXTAREA/)) openAddModal();
   if (e.key === 'r' && !document.activeElement.tagName.match(/INPUT|TEXTAREA/)) syncData();
   if (e.key === 'k' && !document.activeElement.tagName.match(/INPUT|TEXTAREA/)) toggleView();
@@ -2139,6 +2572,116 @@ async function dpDelCom(cid) {
   await apiCall('DELETE', `/comments/${cid}`);
   dpComs = dpComs.filter(c => c.id !== cid); _renderComs();
 }
+
+
+// ══════════════════════════════════════════
+// SIDEBAR
+// ══════════════════════════════════════════
+
+function openSidebar() {
+  updateSbCounts();
+  document.getElementById('sbOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  if (tg) tg.HapticFeedback?.impactOccurred('light');
+}
+
+function closeSidebar() {
+  document.getElementById('sbOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function toggleSbSection(id) {
+  document.getElementById(id).classList.toggle('collapsed');
+}
+
+function sbNav(filter, el) {
+  // Active state on sidebar items
+  document.querySelectorAll('.sb-nav-item[data-filter]').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+  // Sync tabs
+  document.querySelectorAll('.tab[data-f]').forEach(t => {
+    t.classList.toggle('active', t.dataset.f === filter);
+  });
+  // Apply filter and update label
+  currentFilter = filter;
+  document.getElementById('tasksLabel').textContent = FILTER_LABELS[filter] || 'Задачи';
+  renderTasks();
+  closeSidebar();
+}
+
+function updateSbCounts() {
+  const td = today();
+  const active = tasks.filter(t => t.status !== 'done');
+  const counts = {
+    all:     active.length,
+    doing:   tasks.filter(t => t.status === 'doing').length,
+    todo:    tasks.filter(t => t.status === 'todo').length,
+    done:    tasks.filter(t => t.status === 'done').length,
+    today:   tasks.filter(t => t.deadline && t.status !== 'done'
+               && new Date(t.deadline).toDateString() === td.toDateString()).length,
+    overdue: tasks.filter(t => t.deadline && t.status !== 'done'
+               && _safe(t.deadline) < td).length,
+    high:    tasks.filter(t => t.priority === 'high' && t.status !== 'done').length,
+  };
+
+  Object.entries(counts).forEach(([k, v]) => {
+    const el = document.getElementById('sbCnt-' + k);
+    if (el) el.textContent = v > 0 ? v : '';
+  });
+
+  // Stats bar
+  document.getElementById('sbStatAll').textContent     = tasks.length;
+  document.getElementById('sbStatDoing').textContent   = counts.doing;
+  document.getElementById('sbStatOverdue').textContent = counts.overdue;
+
+  // Progress
+  const total = tasks.length;
+  const done  = tasks.filter(t => t.status === 'done').length;
+  const pct   = total ? Math.round(done / total * 100) : 0;
+  document.getElementById('sbPct').textContent      = pct + '%';
+  document.getElementById('sbFill').style.width     = pct + '%';
+
+  // User name
+  const name = userName || (userId ? '@' + userId.slice(0,8) : '');
+  if (name) document.getElementById('sbUserName').textContent = name;
+}
+
+function _safe(s) {
+  try { const d = new Date(s); d.setHours(0,0,0,0); return d; }
+  catch { return new Date(9999,0,1); }
+}
+
+// Keep sidebar active item in sync with filter changes
+function _syncSbActiveItem(filter) {
+  document.querySelectorAll('.sb-nav-item[data-filter]').forEach(i => {
+    i.classList.toggle('active', i.dataset.filter === filter);
+  });
+}
+
+// ── Edge swipe to open (left edge drag) ──
+(function() {
+  const zone = document.getElementById('sbEdgeZone');
+  if (!zone) return;
+  let startX = 0, startY = 0, tracking = false;
+
+  zone.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    tracking = true;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', e => {
+    if (!tracking) return;
+    const dx = e.touches[0].clientX - startX;
+    const dy = Math.abs(e.touches[0].clientY - startY);
+    if (dx > 40 && dy < 50) {
+      tracking = false;
+      openSidebar();
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchend', () => { tracking = false; }, { passive: true });
+})();
 
 // ══════════════════════════════════════════
 // RICH TEXT EDITOR
