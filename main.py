@@ -361,7 +361,7 @@ async def get_tasks(user_id: str = ""):
                 continue
             task = row_to_task(row)
             if user_id and task["user_id"] and task["user_id"] != user_id:
-                continue
+            continue
             tasks.append(task)
 
         return {"tasks": tasks}
