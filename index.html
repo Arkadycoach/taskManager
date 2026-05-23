@@ -737,9 +737,9 @@
     tg.setHeaderColor('#2563EB');
   }
 
-  const userId   = tg?.initDataUnsafe?.user?.id       || 'demo_user';
-  const userName = tg?.initDataUnsafe?.user?.username  || 'demo';
-
+  const userId   = tg?.initDataUnsafe?.user?.id?.toString() || '';
+  const userName = tg?.initDataUnsafe?.user?.username || tg?.initDataUnsafe?.user?.first_name || '';
+  
   let tasks         = [];
   let currentFilter = 'all';
   let currentSort   = 'date_desc';
