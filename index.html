@@ -206,6 +206,44 @@
     .form-input, .form-select, .form-textarea { width: 100%; background: var(--surface2); border: 1.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: inherit; font-size: 14px; padding: 11px 13px; outline: none; transition: border-color .2s, box-shadow .2s; -webkit-appearance: none; }
     .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
     .form-textarea { resize: none; height: 80px; line-height: 1.5; }
+
+    /* ══ RICH TEXT EDITOR ══ */
+    .editor-wrap { border: 1.5px solid var(--border); border-radius: var(--radius-sm); background: var(--surface2); overflow: hidden; transition: border-color .2s, box-shadow .2s; }
+    .editor-wrap:focus-within { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+    .editor-toolbar { display: flex; align-items: center; gap: 1px; padding: 5px 7px; border-bottom: 1px solid var(--border); background: var(--surface); flex-wrap: wrap; }
+    .tb-btn { width: 28px; height: 28px; background: none; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: center; color: var(--text2); transition: background .1s, color .1s; flex-shrink: 0; }
+    .tb-btn:hover { background: var(--blue-soft); color: var(--blue); }
+    .tb-btn:active, .tb-btn.active { background: var(--blue); color: #fff; }
+    .tb-sep { width: 1px; height: 16px; background: var(--border); margin: 0 3px; flex-shrink: 0; }
+    .editor-body { min-height: 90px; max-height: 220px; overflow-y: auto; padding: 10px 12px; font-size: 13px; line-height: 1.7; color: var(--text); outline: none; word-break: break-word; font-family: inherit; }
+    .editor-body:empty::before { content: attr(data-ph); color: var(--muted2); pointer-events: none; display: block; }
+    .editor-body b, .editor-body strong { font-weight: 800; }
+    .editor-body i, .editor-body em { font-style: italic; }
+    .editor-body s { color: var(--muted); }
+    .editor-body a { color: var(--blue); text-decoration: underline; word-break: break-all; }
+    .editor-body img { max-width: 100%; border-radius: 8px; margin: 4px 0; display: block; cursor: pointer; }
+    .editor-body ul, .editor-body ol { padding-left: 18px; margin: 2px 0; }
+    .editor-body li { margin: 1px 0; }
+    .editor-body .cl-item { display: flex; align-items: flex-start; gap: 7px; margin: 3px 0; min-height: 20px; }
+    .editor-body .cl-cb { width: 15px; height: 15px; min-width: 15px; margin-top: 2px; cursor: pointer; accent-color: var(--blue); }
+    .editor-body .cl-text { flex: 1; min-width: 0; outline: none; }
+    .editor-body .cl-item.done .cl-text { text-decoration: line-through; color: var(--muted); }
+    .editor-body .file-link { display: inline-flex; align-items: center; gap: 5px; background: var(--blue-soft); color: var(--blue); padding: 2px 9px; border-radius: 6px; font-size: 12px; font-weight: 700; text-decoration: none; cursor: pointer; margin: 1px 0; }
+    .editor-body .file-link:hover { background: var(--blue); color: #fff; }
+    /* Link dialog */
+    .link-dialog { position: absolute; bottom: 100%; left: 0; right: 0; background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius-sm); padding: 12px; box-shadow: var(--shadow-lg); z-index: 10; display: none; }
+    .link-dialog.open { display: block; }
+    .link-dialog input { width: 100%; border: 1.5px solid var(--border); border-radius: 7px; padding: 8px 11px; font-family: inherit; font-size: 13px; outline: none; margin-bottom: 6px; background: var(--surface2); }
+    .link-dialog input:focus { border-color: var(--blue); }
+    .link-dialog-btns { display: flex; gap: 7px; }
+    .link-dialog-btns button { flex: 1; padding: 8px; border: none; border-radius: 7px; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .ldb-ok  { background: var(--blue); color: #fff; }
+    .ldb-cancel { background: var(--surface2); color: var(--muted); border: 1.5px solid var(--border) !important; }
+    /* Task card rich preview */
+    .task-rich-preview { font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+    .task-rich-preview .rp-check { display: inline-flex; align-items: center; gap: 4px; margin-right: 6px; }
+    .task-rich-preview .rp-check.done { text-decoration: line-through; opacity: .65; }
+    .task-rich-preview .rp-text { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
     .form-select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2364748B' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px; cursor: pointer; }
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .modal-footer { padding: 14px 20px 0; display: flex; gap: 10px; }
@@ -375,9 +413,43 @@
         <label class="form-label">Название *</label>
         <input class="form-input" id="taskTitle" placeholder="Что нужно сделать?">
       </div>
-      <div class="form-group">
+      <div class="form-group" style="position:relative">
         <label class="form-label">Описание</label>
-        <textarea class="form-textarea" id="taskDesc" placeholder="Подробности..."></textarea>
+        <!-- Link dialog -->
+        <div class="link-dialog" id="linkDialog">
+          <input type="text" id="linkUrl"  placeholder="URL (https://...)" autocomplete="off">
+          <input type="text" id="linkText" placeholder="Текст ссылки (необязательно)" autocomplete="off">
+          <div class="link-dialog-btns">
+            <button class="ldb-cancel" onclick="closeLinkDialog()">Отмена</button>
+            <button class="ldb-ok"     onclick="confirmLink()">Вставить ссылку</button>
+          </div>
+        </div>
+        <div class="editor-wrap" id="editorWrap">
+          <!-- Toolbar -->
+          <div class="editor-toolbar" id="editorToolbar">
+            <button class="tb-btn" onmousedown="event.preventDefault();efmt('bold')"          title="Жирный (Ctrl+B)"><b>B</b></button>
+            <button class="tb-btn" onmousedown="event.preventDefault();efmt('italic')"        title="Курсив (Ctrl+I)"><i>I</i></button>
+            <button class="tb-btn" onmousedown="event.preventDefault();efmt('strikeThrough')" title="Зачёркнутый"><s style="font-style:normal">S</s></button>
+            <div class="tb-sep"></div>
+            <button class="tb-btn" onmousedown="event.preventDefault();eChecklist()"          title="Чеклист ☑">☑</button>
+            <button class="tb-btn" onmousedown="event.preventDefault();efmt('insertUnorderedList')" title="Список">•</button>
+            <button class="tb-btn" onmousedown="event.preventDefault();efmt('insertOrderedList')"   title="Нумерованный">№</button>
+            <div class="tb-sep"></div>
+            <button class="tb-btn" onmousedown="event.preventDefault();eLinkOpen()"  title="Ссылка">🔗</button>
+            <button class="tb-btn" onmousedown="event.preventDefault();eImageUrl()"  title="Картинка по URL">🖼</button>
+            <button class="tb-btn" onclick="document.getElementById('imgFileInput').click()" title="Загрузить картинку">📷</button>
+            <button class="tb-btn" onclick="document.getElementById('fileInput').click()"    title="Прикрепить файл">📎</button>
+          </div>
+          <!-- Editable area -->
+          <div class="editor-body" id="taskDesc" contenteditable="true"
+               data-ph="Подробности задачи..."
+               onkeydown="editorKeyDown(event)"
+               onpaste="editorPaste(event)"
+               oninput="editorInput()"></div>
+        </div>
+        <!-- Hidden file inputs -->
+        <input type="file" id="imgFileInput" accept="image/*" style="display:none" onchange="handleImgFile(this)">
+        <input type="file" id="fileInput"   style="display:none"                  onchange="handleFileAttach(this)">
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -543,7 +615,7 @@ function taskCardHTML(task, i = 0) {
            onclick="event.stopPropagation();toggleDone('${task.id}')"></div>
       <div class="task-body">
         <div class="task-title ${task.status==='done'?'done':''}">${escHtml(task.title)}</div>
-        ${task.description ? `<div class="task-desc">${escHtml(task.description)}</div>` : ''}
+        ${task.description ? `<div class="task-rich-preview">${descPreview(task.description)}</div>` : ''}
       </div>
     </div>
     <div class="task-footer">
@@ -877,7 +949,7 @@ async function saveTask() {
   if (!title) { showToast('Введи название', 'error'); return; }
   const data = {
     title,
-    description: document.getElementById('taskDesc').value.trim(),
+    description: getEditorHtml(),
     status:   document.getElementById('taskStatus').value,
     priority: document.getElementById('taskPriority').value,
     deadline: document.getElementById('taskDeadline').value,
@@ -914,7 +986,9 @@ async function deleteTask() {
 function openAddModal() {
   editingId = null;
   document.getElementById('modalTitle').textContent = 'Новая задача';
-  ['taskTitle','taskDesc','taskAssignee'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('taskTitle').value = '';
+  document.getElementById('taskAssignee').value = '';
+  setEditorHtml('');
   document.getElementById('taskStatus').value   = 'todo';
   document.getElementById('taskPriority').value = 'medium';
   document.getElementById('taskDeadline').value = '';
@@ -930,7 +1004,7 @@ function openEditModal(id) {
   editingId = id;
   document.getElementById('modalTitle').textContent = 'Редактировать';
   document.getElementById('taskTitle').value    = task.title;
-  document.getElementById('taskDesc').value     = task.description || '';
+  setEditorHtml(task.description || '');
   document.getElementById('taskStatus').value   = task.status;
   document.getElementById('taskPriority').value = task.priority;
   document.getElementById('taskDeadline').value = task.deadline || '';
@@ -974,6 +1048,293 @@ async function init() {
   setInterval(loadTasks, CONFIG.POLL_INTERVAL);
 }
 window.addEventListener('load', init);
+
+// ══════════════════════════════════════════
+// RICH TEXT EDITOR
+// ══════════════════════════════════════════
+
+let _savedRange = null;
+
+function saveRange() {
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount > 0) _savedRange = sel.getRangeAt(0).cloneRange();
+}
+function restoreRange() {
+  const ed = document.getElementById('taskDesc');
+  ed.focus();
+  if (_savedRange) {
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(_savedRange);
+  }
+}
+
+// Apply execCommand formatting (bold/italic/etc)
+function efmt(cmd) {
+  document.getElementById('taskDesc').focus();
+  document.execCommand(cmd, false, null);
+  updateToolbarState();
+}
+
+function updateToolbarState() {
+  const cmds = {bold:'bold', italic:'italic', strikeThrough:'strikeThrough'};
+  document.querySelectorAll('.tb-btn[data-cmd]').forEach(btn => {
+    btn.classList.toggle('active', document.queryCommandState(btn.dataset.cmd));
+  });
+}
+
+// ── CHECKLIST ──────────────────────────────
+function eChecklist() {
+  const ed  = document.getElementById('taskDesc');
+  ed.focus();
+  const sel = window.getSelection();
+  // Check if we're inside a cl-item already
+  if (sel && sel.rangeCount > 0) {
+    const anchor = sel.anchorNode;
+    const inCL   = anchor.nodeType === 3
+      ? anchor.parentElement?.closest('.cl-item')
+      : anchor.closest?.('.cl-item');
+    if (inCL) return; // already in checklist, don't nest
+  }
+  const item = makeCLItem('');
+  if (sel && sel.rangeCount > 0) {
+    const range = sel.getRangeAt(0);
+    // Get selected text if any
+    const selText = range.toString();
+    range.deleteContents();
+    range.insertNode(item);
+    if (selText) item.querySelector('.cl-text').textContent = selText;
+  } else {
+    ed.appendChild(item);
+  }
+  // Place cursor in text span
+  const span = item.querySelector('.cl-text');
+  const r = document.createRange();
+  r.setStart(span, 0); r.collapse(true);
+  const s = window.getSelection();
+  s.removeAllRanges(); s.addRange(r);
+}
+
+function makeCLItem(text, checked = false) {
+  const wrap = document.createElement('div');
+  wrap.className = 'cl-item' + (checked ? ' done' : '');
+  wrap.setAttribute('data-cl', '1');
+  const cb = document.createElement('input');
+  cb.type = 'checkbox'; cb.className = 'cl-cb'; cb.checked = checked;
+  cb.addEventListener('change', function() {
+    this.closest('.cl-item').classList.toggle('done', this.checked);
+  });
+  const span = document.createElement('span');
+  span.className = 'cl-text';
+  span.contentEditable = 'true';
+  span.textContent = text;
+  wrap.appendChild(cb); wrap.appendChild(span);
+  return wrap;
+}
+
+// ── LINK ───────────────────────────────────
+function eLinkOpen() {
+  saveRange();
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount > 0) {
+    const txt = sel.getRangeAt(0).toString();
+    if (txt) document.getElementById('linkText').value = txt;
+  }
+  document.getElementById('linkDialog').classList.add('open');
+  document.getElementById('linkUrl').focus();
+}
+function closeLinkDialog() {
+  document.getElementById('linkDialog').classList.remove('open');
+  document.getElementById('linkUrl').value = '';
+  document.getElementById('linkText').value = '';
+}
+function confirmLink() {
+  const url  = document.getElementById('linkUrl').value.trim();
+  const text = document.getElementById('linkText').value.trim() || url;
+  if (!url) { closeLinkDialog(); return; }
+  closeLinkDialog();
+  restoreRange();
+  document.execCommand('insertHTML', false,
+    `<a href="${escAttr(url)}" target="_blank" rel="noopener">${escHtml(text)}</a>`);
+}
+// Close link dialog on Escape
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closeLinkDialog();
+    closeModal();
+    closeQA();
+  }
+});
+document.getElementById('linkUrl')?.addEventListener('keydown', e => {
+  if (e.key === 'Enter') confirmLink();
+});
+
+// ── IMAGE ──────────────────────────────────
+function eImageUrl() {
+  const url = prompt('Вставь URL картинки:');
+  if (!url) return;
+  document.getElementById('taskDesc').focus();
+  document.execCommand('insertHTML', false,
+    `<img src="${escAttr(url)}" alt="image" style="max-width:100%;border-radius:8px;margin:4px 0;display:block">`);
+}
+
+function handleImgFile(input) {
+  const file = input.files[0]; if (!file) return;
+  if (file.size > 400000) { showToast('Макс. размер картинки — 400KB', 'error'); input.value=''; return; }
+  const r = new FileReader();
+  r.onload = e => {
+    document.getElementById('taskDesc').focus();
+    document.execCommand('insertHTML', false,
+      `<img src="${e.target.result}" alt="${escAttr(file.name)}" style="max-width:100%;border-radius:8px;margin:4px 0;display:block">`);
+  };
+  r.readAsDataURL(file); input.value = '';
+}
+
+// ── FILE ATTACH ────────────────────────────
+function handleFileAttach(input) {
+  const file = input.files[0]; if (!file) return;
+  const MAX = 150000; // 150KB
+  if (file.size > MAX) {
+    // Too big — insert placeholder link
+    document.getElementById('taskDesc').focus();
+    document.execCommand('insertHTML', false,
+      `<a class="file-link" href="#" data-fname="${escAttr(file.name)}">📎 ${escHtml(file.name)} <span style="opacity:.6;font-weight:400;font-size:10px">(добавь URL вручную)</span></a> `);
+    showToast('Файл > 150KB — замени # на реальный URL', '');
+  } else {
+    const r = new FileReader();
+    r.onload = e => {
+      document.getElementById('taskDesc').focus();
+      document.execCommand('insertHTML', false,
+        `<a class="file-link" href="${e.target.result}" download="${escAttr(file.name)}">📎 ${escHtml(file.name)}</a> `);
+    };
+    r.readAsDataURL(file);
+  }
+  input.value = '';
+}
+
+// ── KEYBOARD SHORTCUTS ─────────────────────
+function editorKeyDown(e) {
+  const sel = window.getSelection();
+  const node = sel?.anchorNode;
+  const clItem = node?.nodeType === 3
+    ? node.parentElement?.closest('.cl-item')
+    : node?.closest?.('.cl-item');
+
+  // Enter in checklist → new checklist item
+  if (e.key === 'Enter' && clItem && !e.shiftKey) {
+    e.preventDefault();
+    const textEl = clItem.querySelector('.cl-text');
+    // If empty → exit checklist
+    if (!textEl.textContent.trim()) {
+      const br = document.createElement('br');
+      clItem.replaceWith(br);
+      const r = document.createRange();
+      r.setStartAfter(br); r.collapse(true);
+      sel.removeAllRanges(); sel.addRange(r);
+      return;
+    }
+    const next = makeCLItem('');
+    clItem.parentNode.insertBefore(next, clItem.nextSibling);
+    const span = next.querySelector('.cl-text');
+    const r2 = document.createRange();
+    r2.setStart(span, 0); r2.collapse(true);
+    sel.removeAllRanges(); sel.addRange(r2);
+    return;
+  }
+  // Backspace on empty checklist → remove
+  if (e.key === 'Backspace' && clItem) {
+    const textEl = clItem.querySelector('.cl-text');
+    if (!textEl.textContent) { e.preventDefault(); clItem.remove(); }
+  }
+  // Ctrl+B, Ctrl+I
+  if ((e.ctrlKey || e.metaKey) && e.key === 'b') { e.preventDefault(); efmt('bold'); }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'i') { e.preventDefault(); efmt('italic'); }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); eLinkOpen(); }
+}
+
+function editorInput() { updateToolbarState(); }
+
+// ── PASTE (images from clipboard) ──────────
+function editorPaste(e) {
+  const items = e.clipboardData?.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      e.preventDefault();
+      const file = item.getAsFile();
+      if (file.size > 400000) { showToast('Картинка слишком большая (макс 400KB)', 'error'); return; }
+      const r = new FileReader();
+      r.onload = ev => {
+        document.execCommand('insertHTML', false,
+          `<img src="${ev.target.result}" alt="paste" style="max-width:100%;border-radius:8px;margin:4px 0;display:block">`);
+      };
+      r.readAsDataURL(file); return;
+    }
+  }
+}
+
+// ── GET / SET content ──────────────────────
+function getEditorHtml() {
+  const ed = document.getElementById('taskDesc');
+  // Serialize cl-items properly
+  const clone = ed.cloneNode(true);
+  // Mark checked checkboxes in the serialized HTML
+  clone.querySelectorAll('.cl-item').forEach(item => {
+    const cb = item.querySelector('.cl-cb');
+    if (cb?.checked) item.setAttribute('data-checked','1');
+    else item.removeAttribute('data-checked');
+  });
+  return clone.innerHTML;
+}
+
+function setEditorHtml(html) {
+  const ed = document.getElementById('taskDesc');
+  ed.innerHTML = html || '';
+  // Re-attach checkbox listeners after setting content
+  ed.querySelectorAll('.cl-item').forEach(item => {
+    const cb = item.querySelector('.cl-cb');
+    if (!cb) return;
+    if (item.dataset.checked === '1') { cb.checked = true; item.classList.add('done'); }
+    cb.addEventListener('change', function() {
+      this.closest('.cl-item').classList.toggle('done', this.checked);
+    });
+  });
+}
+
+// ── PREVIEW in task cards ──────────────────
+function descPreview(html) {
+  if (!html) return '';
+  // Try rendering as rich HTML first
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+
+  // Build preview: show checklist items as inline chips, then text
+  const checks = tmp.querySelectorAll('.cl-item');
+  if (checks.length) {
+    // Show checklist summary
+    const total  = checks.length;
+    const done   = [...checks].filter(c => c.classList.contains('done') || c.dataset.checked === '1').length;
+    const chips  = [...checks].slice(0, 3).map(c => {
+      const isDone = c.classList.contains('done') || c.dataset.checked==='1';
+      const text   = (c.querySelector('.cl-text')?.textContent || c.textContent).trim().slice(0, 22);
+      return `<span class="rp-check${isDone?' done':''}">${isDone?'☑':'☐'} ${escHtml(text)}</span>`;
+    }).join('');
+    const more = total > 3 ? `<span style="color:var(--muted2);font-size:10px"> +${total-3}</span>` : '';
+    return `<div style="margin-bottom:2px">${chips}${more}</div>`
+         + `<div style="font-size:10px;color:var(--muted2)">☑ ${done}/${total} выполнено</div>`;
+  }
+
+  // Plain text preview for regular content
+  const plain = (tmp.textContent || tmp.innerText || '').replace(/\s+/g,' ').trim();
+  if (!plain) return '';
+  const safe  = escHtml(plain.slice(0, 120)) + (plain.length > 120 ? '…' : '');
+  return `<span class="rp-text">${safe}</span>`;
+}
+
+function escAttr(s) {
+  return String(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
 </script>
 </body>
 </html>
