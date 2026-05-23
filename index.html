@@ -304,23 +304,34 @@
     .kanban-card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 9px; padding: 10px 12px;
-      cursor: pointer; font-size: 12px; font-weight: 600;
-      line-height: 1.4; transition: all var(--fast);
+      border-radius: 12px;
+      padding: 0;
+      cursor: pointer;
+      transition: all var(--fast) var(--ease);
       position: relative; overflow: hidden;
-      box-shadow: var(--shadow-xs);
+      box-shadow: 0 1px 3px rgba(17,24,39,.05);
     }
     .kanban-card::before {
-      content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      border-radius: 12px 12px 0 0;
     }
     .kanban-card.p-high::before   { background: var(--red); }
     .kanban-card.p-medium::before { background: var(--yellow); }
     .kanban-card.p-low::before    { background: var(--green); }
-    .kanban-card:active { box-shadow: var(--shadow); }
-    .kanban-card-meta {
-      font-size: 10px; color: var(--muted); margin-top: 6px;
-      display: flex; gap: 5px; flex-wrap: wrap;
+    .kanban-card:active {
+      box-shadow: 0 4px 12px rgba(17,24,39,.10);
+      transform: scale(.97);
     }
+    .kanban-card-inner { padding: 10px 11px 9px; }
+    .kanban-card-title { font-size: 12px; font-weight: 680; color: var(--text); line-height: 1.4; letter-spacing: -.01em; }
+    .kanban-card-meta {
+      font-size: 10px; color: var(--muted); margin-top: 7px;
+      display: flex; gap: 5px; flex-wrap: wrap; align-items: center;
+    }
+    .kanban-card-meta .km-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .kanban-card-meta .km-dot.high   { background: var(--red); }
+    .kanban-card-meta .km-dot.medium { background: var(--yellow); }
+    .kanban-card-meta .km-dot.low    { background: var(--green); }
 
     /* ── TASKS HEADER ───────────────────────────────── */
     .tasks-header {
@@ -356,110 +367,203 @@
     }
 
     /* ── TASK CARDS ─────────────────────────────────── */
-    .tasks-list { padding: 0 16px; display: flex; flex-direction: column; gap: 8px; }
+
+    /* ══════════════════════════════════════════════════
+       TASK CARD — redesigned for scan-ability
+    ══════════════════════════════════════════════════ */
+
+    @keyframes cardIn {
+      from { opacity:0; transform:translateY(8px) scale(.99); }
+      to   { opacity:1; transform:translateY(0)    scale(1); }
+    }
+    @keyframes checkPop {
+      0%  { transform:scale(.6); }
+      55% { transform:scale(1.22); }
+      100%{ transform:scale(1); }
+    }
+    @keyframes checkRing {
+      0%   { box-shadow: 0 0 0 0 rgba(12,166,120,.4); }
+      100% { box-shadow: 0 0 0 8px rgba(12,166,120,0); }
+    }
+
+    .tasks-list { padding: 0 14px; display: flex; flex-direction: column; gap: 7px; }
 
     .task-card {
+      --card-accent: var(--border2);
+      position: relative;
       background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px 14px 12px 14px;
+      border-radius: 16px;
+      padding: 0;
       cursor: pointer;
-      position: relative; overflow: hidden;
-      animation: cardIn .24s var(--ease) both;
-      box-shadow: var(--shadow-sm);
-      transition: box-shadow var(--mid), border-color var(--mid), transform var(--fast);
+      overflow: hidden;
+      animation: cardIn .22s var(--ease) both;
+      box-shadow: 0 1px 2px rgba(17,24,39,.05), 0 2px 8px rgba(17,24,39,.05);
+      border: 1px solid var(--border);
+      transition: box-shadow .2s var(--ease), border-color .2s, transform .12s var(--ease);
       touch-action: pan-y;
     }
-    @keyframes cardIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
-    .task-card:active { box-shadow: var(--shadow); border-color: var(--border2); }
-
-    /* Priority accent stripe — slimmer, softer */
-    .task-card::before {
-      content: ''; position: absolute; left: 0; top: 8px; bottom: 8px;
-      width: 3px; border-radius: 0 3px 3px 0;
+    .task-card:active {
+      transform: scale(.987);
+      box-shadow: 0 4px 16px rgba(17,24,39,.10), 0 1px 4px rgba(17,24,39,.06);
     }
+
+    /* Priority-colored top bar — full width, 3px */
+    .task-card::before {
+      content: ''; position: absolute;
+      top: 0; left: 0; right: 0; height: 3px;
+      border-radius: 16px 16px 0 0;
+      transition: opacity .2s;
+    }
+    .task-card.p-high   { --card-accent: var(--red);    border-color: rgba(224,49,49,.15); }
+    .task-card.p-medium { --card-accent: var(--yellow);  border-color: rgba(224,140,0,.12); }
+    .task-card.p-low    { --card-accent: var(--green);   border-color: rgba(12,166,120,.12); }
     .task-card.p-high::before   { background: var(--red); }
     .task-card.p-medium::before { background: var(--yellow); }
     .task-card.p-low::before    { background: var(--green); }
+    .task-card.done-card { opacity: .65; }
 
-    .task-card.swiping { transition: transform .05s; }
-    .task-card.swipe-done { background: var(--grn-soft); border-color: #A7F3D0; }
-    .task-card.today-pinned { border-color: #FCD34D; }
-
-    /* Swipe indicator */
+    /* Swipe overlay */
     .swipe-hint {
-      position: absolute; left: 0; top: 0; bottom: 0; width: 0;
-      background: linear-gradient(90deg, rgba(12,166,120,.12), transparent);
+      position: absolute; inset: 0;
+      background: linear-gradient(90deg, rgba(12,166,120,.1) 0%, transparent 70%);
       border-radius: inherit; pointer-events: none;
-      display: flex; align-items: center; padding-left: 12px;
-      font-size: 18px; opacity: 0;
+      display: flex; align-items: center; padding-left: 18px;
+      font-size: 22px; opacity: 0; transition: opacity .1s;
     }
     .swipe-hint.show { opacity: 1; }
+    .task-card.swipe-done { background: #F0FDF9; border-color: #A7F3D0; }
 
-    /* Today badge */
-    .task-card.today-pinned::after {
-      content: 'СЕГОДНЯ';
-      position: absolute; top: 9px; right: 10px;
-      font-size: 8px; font-weight: 800; letter-spacing: .05em;
-      color: var(--yellow); background: var(--yel-soft);
-      padding: 2px 6px; border-radius: 4px;
+    /* ── Card inner layout ── */
+    .task-card-inner {
+      padding: 14px 14px 13px 16px;
+      display: flex; flex-direction: column; gap: 10px;
     }
 
-    .task-top { display: flex; align-items: flex-start; gap: 11px; }
+    /* ROW 1: checkbox + title + date-badge */
+    .task-row1 {
+      display: flex; align-items: flex-start; gap: 11px;
+    }
+
+    /* Checkbox — circular, premium */
     .task-check {
-      width: 20px; height: 20px;
-      border-radius: 6px;
-      border: 1.5px solid var(--border2);
-      flex-shrink: 0; margin-top: 2px;
+      width: 22px; height: 22px; min-width: 22px;
+      border-radius: 50%;
+      border: 2px solid var(--border2);
       display: flex; align-items: center; justify-content: center;
-      transition: all var(--mid) var(--ease); cursor: pointer;
+      cursor: pointer; flex-shrink: 0; margin-top: 1px;
+      transition: border-color .18s, background .18s, box-shadow .18s;
+      position: relative;
     }
-    .task-check:active { transform: scale(.85); }
+    .task-check:hover { border-color: var(--green); }
+    .task-check:active { transform: scale(.84); }
     .task-check.checked {
       background: var(--green); border-color: var(--green);
-      animation: checkPop .3s var(--ease);
+      animation: checkPop .32s var(--ease), checkRing .5s ease-out;
     }
-    .task-check.checked::after { content: '✓'; font-size: 12px; color: #fff; font-weight: 800; }
-    @keyframes checkPop { 0%{transform:scale(.75)} 60%{transform:scale(1.18)} 100%{transform:scale(1)} }
+    .task-check.checked::after {
+      content: '';
+      width: 5px; height: 9px;
+      border: 2px solid #fff; border-top: none; border-left: none;
+      transform: rotate(45deg) translate(-1px, -1px);
+      display: block;
+    }
 
+    /* Title block */
     .task-body { flex: 1; min-width: 0; }
     .task-title {
-      font-size: 14px; font-weight: 700;
-      line-height: 1.4; word-break: break-word; color: var(--text);
-      letter-spacing: -.01em;
+      font-size: 14px; font-weight: 680;
+      line-height: 1.42; word-break: break-word;
+      color: var(--text); letter-spacing: -.012em;
     }
-    .task-title.done { text-decoration: line-through; color: var(--muted); font-weight: 500; }
+    .task-title.done {
+      text-decoration: line-through;
+      text-decoration-color: var(--muted2);
+      text-decoration-thickness: 1.5px;
+      color: var(--muted); font-weight: 500;
+    }
+
+    /* Rich-text description preview */
     .task-desc {
-      font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.5;
+      font-size: 12.5px; color: var(--muted); margin-top: 3px; line-height: 1.5;
+      overflow: hidden; display: -webkit-box;
+      -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    }
+    .task-rich-preview { font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+    .task-rich-preview .rp-check { display: inline-flex; align-items: center; gap: 4px; margin-right: 5px; }
+    .task-rich-preview .rp-check.done { text-decoration: line-through; opacity: .6; }
+    .task-rich-preview .rp-text { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
+    /* Due date badge — top-right, prominent */
+    .task-due {
+      flex-shrink: 0; margin-left: 4px; margin-top: 1px;
+      display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
+    }
+    .task-due-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 11px; font-weight: 700; letter-spacing: .01em;
+      padding: 3px 8px; border-radius: 99px;
+      white-space: nowrap;
+    }
+    .task-due-badge.normal  { background: var(--surface2); color: var(--muted); }
+    .task-due-badge.today   { background: #FEF3C7; color: #B45309; }
+    .task-due-badge.overdue { background: #FEE2E2; color: #C0392B; }
+    .task-due-badge.soon    { background: #FFF7ED; color: #C05621; }
+
+    /* ROW 2: meta pills row */
+    .task-row2 {
+      display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
     }
 
-    .task-footer {
-      display: flex; align-items: center; gap: 5px;
-      margin-top: 10px; flex-wrap: wrap;
+    /* Status pill — new design with dot */
+    .task-status-pill {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 11px; font-weight: 600; letter-spacing: .01em;
+      padding: 3px 9px 3px 6px; border-radius: 99px;
     }
-    /* Chips — smaller and softer */
-    .chip {
-      display: inline-flex; align-items: center;
-      font-size: 10px; font-weight: 700; letter-spacing: .02em;
-      padding: 3px 7px; border-radius: 5px;
+    .task-status-dot {
+      width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
     }
-    .chip-todo   { background: #EEF2FF; color: #3B5BDB; }
-    .chip-doing  { background: #FFFBEB; color: #92400E; }
-    .chip-done   { background: #ECFDF8; color: #065F46; }
-    .chip-high   { background: var(--red-soft);  color: #991B1B; }
-    .chip-medium { background: var(--yel-soft);  color: #92400E; }
-    .chip-low    { background: var(--grn-soft);  color: #065F46; }
-    .chip-assignee {
-      background: var(--surface2); color: var(--muted);
-      border: 1px solid var(--border);
-    }
+    .task-status-pill.s-todo  { background: #EEF2FF; color: #4263EB; }
+    .task-status-pill.s-todo .task-status-dot  { background: #748FFC; }
+    .task-status-pill.s-doing { background: #FFF9DB; color: #875A00; }
+    .task-status-pill.s-doing .task-status-dot { background: #FAB005; }
+    .task-status-pill.s-done  { background: #EBFBEE; color: #2B7A3D; }
+    .task-status-pill.s-done .task-status-dot  { background: #40C057; }
 
-    .task-date {
+    /* Priority dot — tiny, beside other meta */
+    .task-prio-dot {
+      width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+    }
+    .task-prio-dot.high   { background: #E03131; box-shadow: 0 0 0 2px rgba(224,49,49,.2); }
+    .task-prio-dot.medium { background: #F59F00; box-shadow: 0 0 0 2px rgba(245,159,0,.2); }
+    .task-prio-dot.low    { background: #12B886; box-shadow: 0 0 0 2px rgba(18,184,134,.2); }
+
+    /* Assignee chip */
+    .task-assignee {
+      display: inline-flex; align-items: center; gap: 4px;
       font-size: 11px; font-weight: 600; color: var(--muted);
-      margin-left: auto; white-space: nowrap; letter-spacing: .01em;
+      padding: 3px 8px; border-radius: 99px;
+      background: var(--surface2); border: 1px solid var(--border);
+      max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .task-date.overdue { color: var(--red); }
-    .task-date.today   { color: var(--yellow); }
+    .task-assignee-av {
+      width: 14px; height: 14px; border-radius: 50%;
+      background: var(--blue-mid); color: var(--blue);
+      font-size: 8px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+
+    /* Separator dot between meta items */
+    .task-meta-sep {
+      width: 3px; height: 3px; border-radius: 50%;
+      background: var(--border2); flex-shrink: 0;
+    }
+
+    /* Today highlight border */
+    .task-card.today-pinned {
+      border-color: rgba(245,158,11,.35);
+      box-shadow: 0 0 0 1px rgba(245,158,11,.15), 0 2px 8px rgba(17,24,39,.05);
+    }
 
     /* ── EMPTY STATE ────────────────────────────────── */
     .empty-state { text-align: center; padding: 64px 24px; color: var(--muted); }
@@ -1303,27 +1407,80 @@ function applyFiltersAndSort(list) {
 }
 
 function taskCardHTML(task, i = 0) {
-  const dl  = deadlineStr(task);
-  const isToday = task.deadline && new Date(task.deadline).toDateString() === today().toDateString() && task.status !== 'done';
+  const dl      = deadlineStr(task);
+  const td      = today();
+  const isToday = task.deadline && new Date(task.deadline).toDateString() === td.toDateString() && task.status !== 'done';
+  const isDone  = task.status === 'done';
+
+  // ── Due date badge ──────────────────────────────────────────
+  let dueBadge = '';
+  if (task.deadline && !isDone) {
+    const d       = new Date(task.deadline);
+    const diffDay = Math.round((d - td) / 864e5);
+    let cls, icon, label;
+    if      (diffDay < 0)  { cls = 'overdue'; icon = '⚠'; label = dl.label.replace('⚠ ',''); }
+    else if (diffDay === 0) { cls = 'today';   icon = '●'; label = 'Сегодня'; }
+    else if (diffDay === 1) { cls = 'soon';    icon = '◑'; label = 'Завтра'; }
+    else if (diffDay <= 3)  { cls = 'soon';    icon = '○'; label = dl.label; }
+    else                    { cls = 'normal';  icon = '○'; label = dl.label; }
+    dueBadge = `<div class="task-due"><span class="task-due-badge ${cls}">${icon} ${label}</span></div>`;
+  } else if (task.deadline && isDone) {
+    // Show muted date for done tasks
+    const d = new Date(task.deadline);
+    dueBadge = `<div class="task-due"><span class="task-due-badge normal">○ ${dl.label}</span></div>`;
+  }
+
+  // ── Assignee ────────────────────────────────────────────────
+  let assigneeHTML = '';
+  if (task.assignee) {
+    const letter = task.assignee.replace('@','').slice(0,1).toUpperCase();
+    assigneeHTML = `
+      <span class="task-meta-sep"></span>
+      <span class="task-assignee">
+        <span class="task-assignee-av">${letter}</span>
+        ${escHtml(task.assignee.replace('@',''))}
+      </span>`;
+  }
+
+  // ── Description preview ─────────────────────────────────────
+  const descHTML = task.description
+    ? `<div class="task-rich-preview">${descPreview(task.description)}</div>`
+    : '';
+
+  // ── Status label ────────────────────────────────────────────
+  const STATUS_SHORT = { todo: 'Новая', doing: 'В работе', done: 'Готово' };
+
   return `
-  <div class="task-card p-${task.priority}${isToday ? ' today-pinned' : ''}"
+  <div class="task-card p-${task.priority}${isToday ? ' today-pinned' : ''}${isDone ? ' done-card' : ''}"
        data-id="${task.id}"
-       style="animation-delay:${i*0.035}s"
+       style="animation-delay:${i*0.03}s"
        onclick="openDetail('${task.id}')">
     <div class="swipe-hint" id="sh_${task.id}">✅</div>
-    <div class="task-top">
-      <div class="task-check ${task.status==='done'?'checked':''}"
-           onclick="event.stopPropagation();toggleDone('${task.id}')"></div>
-      <div class="task-body">
-        <div class="task-title ${task.status==='done'?'done':''}">${escHtml(task.title)}</div>
-        ${task.description ? `<div class="task-rich-preview">${descPreview(task.description)}</div>` : ''}
+
+    <div class="task-card-inner">
+
+      <!-- ROW 1: check · title · due badge -->
+      <div class="task-row1">
+        <div class="task-check ${isDone ? 'checked' : ''}"
+             onclick="event.stopPropagation();toggleDone('${task.id}')"></div>
+        <div class="task-body">
+          <div class="task-title ${isDone ? 'done' : ''}">${escHtml(task.title)}</div>
+          ${descHTML}
+        </div>
+        ${dueBadge}
       </div>
-    </div>
-    <div class="task-footer">
-      <span class="chip chip-${task.status}">${STATUS_LABELS[task.status]}</span>
-      <span class="chip chip-${task.priority}">${PRIORITY_LABELS[task.priority]}</span>
-      ${task.assignee ? `<span class="chip chip-assignee">${escHtml(task.assignee)}</span>` : ''}
-      ${dl ? `<span class="task-date${dl.isOverdue?' overdue':dl.isToday?' today':''}">${dl.label}</span>` : ''}
+
+      <!-- ROW 2: status · priority dot · assignee -->
+      <div class="task-row2">
+        <span class="task-status-pill s-${task.status}">
+          <span class="task-status-dot"></span>
+          ${STATUS_SHORT[task.status]}
+        </span>
+        <span class="task-meta-sep"></span>
+        <span class="task-prio-dot ${task.priority}"></span>
+        ${assigneeHTML}
+      </div>
+
     </div>
   </div>`;
 }
