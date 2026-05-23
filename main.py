@@ -28,8 +28,9 @@ GOOGLE_CREDS_JSON  = os.getenv("GOOGLE_CREDS_JSON", "")
 OPENAI_API_KEY     = os.getenv("OPENAI_API_KEY", "")   # для Whisper
 ANTHROPIC_API_KEY  = os.getenv("ANTHROPIC_API_KEY", "") # для AI-парсинга команд
 
-SHEET_NAME     = "Tasks"
-LOG_SHEET_NAME = "ChangeLog"
+SHEET_NAME       = "Tasks"
+LOG_SHEET_NAME   = "ChangeLog"
+SETTINGS_SHEET   = "⚙️ Настройки"   # Лист настроек (Apps Script создаёт его)
 
 SCOPES = [
     "https://spreadsheets.google.com/feeds",
@@ -311,6 +312,94 @@ async def register_user(data: dict):
     if uid and cid:
         user_chat_ids[uid] = int(cid)
     return {"ok": True}
+
+# ==========================================
+# ИСПОЛНИТЕЛИ API
+# ==========================================
+@app.get("/assignees")
+async def get_assignees():
+    """Возвращает список исполнителей из листа Настройки."""
+    try:
+        client = get_sheets_client()
+        sp = client.open_by_key(SHEET_ID)
+        try:
+            settings = sp.worksheet(SETTINGS_SHEET)
+            # Колонка C: ИСПОЛНИТЕЛИ (строка 1 — заголовок, со строки 2 — данные)
+            col = settings.col_values(3)
+            assignees = [v.strip() for v in col[1:] if v and v.strip()]
+        except gspread.WorksheetNotFound:
+            assignees = []
+        return {"assignees": assignees}
+    except Exception as e:
+        logger.error(f"get_assignees: {e}")
+        return {"assignees": []}
+
+@app.post("/assignees")
+async def add_assignee(data: dict):
+    """Добавляет нового исполнителя в лист Настройки."""
+    name = str(data.get("name", "")).strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Name required")
+    try:
+        client = get_sheets_client()
+        sp = client.open_by_key(SHEET_ID)
+        try:
+            settings = sp.worksheet(SETTINGS_SHEET)
+        except gspread.WorksheetNotFound:
+            # Создаём лист Настройки если нет
+            settings = sp.add_worksheet(title=SETTINGS_SHEET, rows=200, cols=5)
+            settings.append_row(["СТАТУСЫ", "ПРИОРИТЕТЫ", "ИСПОЛНИТЕЛИ"])
+        # Проверяем дубликат
+        col = settings.col_values(3)
+        existing = [v.strip().lower() for v in col[1:] if v]
+        if name.lower() in existing:
+            return {"success": True, "message": "Already exists"}
+        # Ищем первую пустую ячейку в колонке C (с 3й строки, чтобы не задеть заголовок)
+        next_row = len(col) + 1 if len(col) >= 2 else 3
+        settings.update_cell(next_row, 3, name)
+        # Обновляем валидацию исполнителей в Tasks
+        try:
+            tasks_sheet = sp.worksheet(SHEET_NAME)
+            all_assignees = [v.strip() for v in settings.col_values(3)[1:] if v and v.strip()]
+            sid = tasks_sheet.id
+            sp.batch_update({"requests": [{
+                "setDataValidation": {
+                    "range": {"sheetId": sid, "startRowIndex": 1, "endRowIndex": 1000,
+                              "startColumnIndex": 6, "endColumnIndex": 7},
+                    "rule": {"condition": {"type": "ONE_OF_LIST",
+                             "values": [{"userEnteredValue": a} for a in all_assignees]},
+                             "showCustomUi": True, "strict": False}
+                }
+            }]})
+        except Exception as ve:
+            logger.warning(f"validation update: {ve}")
+        return {"success": True, "assignees": [v.strip() for v in settings.col_values(3)[1:] if v and v.strip()]}
+    except Exception as e:
+        logger.error(f"add_assignee: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/assignees/{name}")
+async def delete_assignee(name: str):
+    """Удаляет исполнителя из листа Настройки."""
+    try:
+        client = get_sheets_client()
+        sp = client.open_by_key(SHEET_ID)
+        settings = sp.worksheet(SETTINGS_SHEET)
+        col = settings.col_values(3)
+        for i, val in enumerate(col):
+            if val.strip().lower() == name.strip().lower() and i > 0:
+                settings.update_cell(i + 1, 3, "")
+                break
+        # Убираем пустые строки переупорядочиванием
+        remaining = [v.strip() for v in settings.col_values(3)[1:] if v and v.strip()]
+        if remaining:
+            # Очищаем и перезаписываем
+            max_row = len(col) + 1
+            settings.update(f"C2:C{max_row}", [[v] for v in remaining] + [[""] * (max_row - len(remaining) - 1)])
+        return {"success": True, "assignees": remaining}
+    except Exception as e:
+        logger.error(f"delete_assignee: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/admin/setup-sheet")
 async def admin_setup_sheet():
@@ -635,13 +724,15 @@ async def check_sheet_changes():
             current = {}
             for row in rows[1:]:
                 if row and row[0]:
-                    t = row_to_task(row); current[t["id"]] = t
+                    t = row_to_task(row)
+                    current[t["id"]] = t
 
             if _last_sheet_state:
-                # Изменённые задачи
+                # Изменённые и новые задачи
                 for tid, task in current.items():
                     if tid in _last_sheet_state:
-                        old = _last_sheet_state[tid]; changes = []
+                        old = _last_sheet_state[tid]
+                        changes = []
                         if old["title"]    != task["title"]:    changes.append(f"📝 Название: *{task['title']}*")
                         if old["status"]   != task["status"]:   changes.append(f"🔄 Статус: {STATUS_TO_RU.get(old['status'])} → *{STATUS_TO_RU.get(task['status'])}*")
                         if old["priority"] != task["priority"]: changes.append(f"⚡ Приоритет: {PRIORITY_TO_RU.get(task['priority'])}")
@@ -659,6 +750,24 @@ async def check_sheet_changes():
                         await _notify_task_event("delete", _last_sheet_state[tid], "")
 
             _last_sheet_state = current
+
+            # ── Авто-генерация ID для строк добавленных вручную в Sheets ──
+            try:
+                now = datetime.now().isoformat(timespec="seconds")
+                for i, row in enumerate(rows[1:], start=2):
+                    id_cell = row[0] if len(row) > 0 else ""
+                    title   = row[1] if len(row) > 1 else ""
+                    if not id_cell.strip() and title.strip():
+                        new_id = str(uuid.uuid4())[:8].upper()
+                        sheet.update_cell(i, 1, new_id)
+                        if len(row) < 10 or not row[9]:
+                            sheet.update_cell(i, 10, now)
+                        if len(row) < 11 or not row[10]:
+                            sheet.update_cell(i, 11, now)
+                        logger.info(f"Auto-generated ID {new_id} for row {i}: {title}")
+            except Exception as id_err:
+                logger.warning(f"auto_id: {id_err}")
+
         except Exception as e:
             logger.error(f"check_sheet_changes: {e}")
 
