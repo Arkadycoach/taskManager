@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Task Manager</title>
+
+  <!-- ══ PWA ══════════════════════════════════════════════ -->
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon"             href="/icons/favicon.ico">
+  <link rel="apple-touch-icon" sizes="180x180"                 href="/icons/icon-apple.png">
+
+  <!-- iOS PWA — выглядит как нативное приложение -->
+  <meta name="apple-mobile-web-app-capable"          content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title"            content="Tasks">
+  <meta name="mobile-web-app-capable"                content="yes">
+
+  <!-- Android / Chrome -->
+  <meta name="theme-color" content="#3B5BDB">
+  <meta name="msapplication-TileColor" content="#1B2F6E">
+
+  <!-- SEO -->
+  <meta name="description" content="Управление задачами с синхронизацией Google Sheets">
+
+  <!-- Splash screen цвет пока грузится (iOS) -->
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Telegram WebApp SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <!-- ══ CSS ══════════════════════════════════════════════ -->
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/modals.css">
+  <link rel="stylesheet" href="/css/sidebar.css">
+  <link rel="stylesheet" href="/css/details.css">
+  <link rel="stylesheet" href="/css/responsive.css">
+
+  <!-- Service Worker регистрируем здесь — до body -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(r => console.log('SW registered:', r.scope))
+          .catch(e => console.log('SW error:', e));
+      });
+    }
+    // Handle ?action=add shortcut from PWA
+    if (location.search.includes('action=add')) {
+      window.addEventListener('load', () => {
+        setTimeout(() => window.ModalsModule?.openAdd(), 600);
+      });
+    }
+  </script>
+</head>
+<body>
+
+<!-- ── Loading ───────────────────────────────────────────── -->
+<div class="loading" id="loading">
+  <div class="loading-logo">Task<span>Manager</span></div>
+  <div class="spinner"></div>
+</div>
+
+<!-- ── Sidebar ───────────────────────────────────────────── -->
+<div class="sb-overlay" id="sbOverlay">
+  <div class="sidebar" id="sidebar">
+    <div class="sb-head">
+      <div class="sb-app-icon">📋</div>
+      <div class="sb-app-meta">
+        <div class="sb-app-name">Task Manager</div>
+        <div class="sb-user-name" id="sbUserName">Загрузка...</div>
+      </div>
+      <button class="sb-close" id="sbCloseBtn">✕</button>
+    </div>
+    <div class="sb-stats-bar">
+      <div class="sb-stat"><span class="sb-stat-n" id="sbStatAll">0</span><span class="sb-stat-l">Всего</span></div>
+      <div class="sb-stat-sep"></div>
+      <div class="sb-stat"><span class="sb-stat-n" id="sbStatDoing">0</span><span class="sb-stat-l">В работе</span></div>
+      <div class="sb-stat-sep"></div>
+      <div class="sb-stat"><span class="sb-stat-n" id="sbStatOverdue" style="color:var(--red)">0</span><span class="sb-stat-l" style="color:var(--red)">Просроч.</span></div>
+    </div>
+    <div class="sb-body">
+      <div style="padding:10px 8px 4px">
+        <button class="sb-add-btn" id="sbAddBtn"><span class="sb-add-icon">+</span><span>Новая задача</span></button>
+      </div>
+      <div class="sb-divider"></div>
+      <div class="sb-section" id="sbSec1">
+        <div class="sb-section-header" data-section="sbSec1"><span class="sb-section-title">Задачи</span><span class="sb-chevron">▾</span></div>
+        <div class="sb-section-body">
+          <div class="sb-nav-item active" data-filter="all"><span class="sb-icon">◈</span><span class="sb-label">Все активные</span><span class="sb-nav-badge" id="sbCnt-all"></span></div>
+          <div class="sb-nav-item" data-filter="doing"><span class="sb-icon" style="color:#F59F00">⚡</span><span class="sb-label">В работе</span><span class="sb-nav-badge warn" id="sbCnt-doing"></span></div>
+          <div class="sb-nav-item" data-filter="todo"><span class="sb-icon" style="color:#748FFC">○</span><span class="sb-label">Новые</span><span class="sb-nav-badge" id="sbCnt-todo"></span></div>
+          <div class="sb-nav-item" data-filter="done"><span class="sb-icon" style="color:#40C057">✓</span><span class="sb-label">Выполненные</span><span class="sb-nav-badge" id="sbCnt-done"></span></div>
+        </div>
+      </div>
+      <div class="sb-section" id="sbSec2">
+        <div class="sb-section-header" data-section="sbSec2"><span class="sb-section-title">По дате</span><span class="sb-chevron">▾</span></div>
+        <div class="sb-section-body">
+          <div class="sb-nav-item" data-filter="today"><span class="sb-icon" style="color:#B45309">●</span><span class="sb-label">Сегодня</span><span class="sb-nav-badge warn" id="sbCnt-today"></span></div>
+          <div class="sb-nav-item" data-filter="overdue"><span class="sb-icon" style="color:var(--red)">⚠</span><span class="sb-label">Просроченные</span><span class="sb-nav-badge danger" id="sbCnt-overdue"></span></div>
+        </div>
+      </div>
+      <div class="sb-section" id="sbSec3">
+        <div class="sb-section-header" data-section="sbSec3"><span class="sb-section-title">Приоритет</span><span class="sb-chevron">▾</span></div>
+        <div class="sb-section-body">
+          <div class="sb-nav-item" data-filter="high"><span class="sb-icon" style="color:var(--red)">↑</span><span class="sb-label">Высокий</span><span class="sb-nav-badge danger" id="sbCnt-high"></span></div>
+        </div>
+      </div>
+      <div class="sb-section collapsed" id="sbSec4">
+        <div class="sb-section-header" data-section="sbSec4"><span class="sb-section-title">Виды</span><span class="sb-chevron">▾</span></div>
+        <div class="sb-section-body">
+          <div class="sb-nav-item" data-action="toggleView"><span class="sb-icon">⊞</span><span class="sb-label">Канбан-доска</span></div>
+          <div class="sb-nav-item" data-action="refresh"><span class="sb-icon">⟳</span><span class="sb-label">Обновить данные</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="sb-footer">
+      <div class="sb-prog-row"><span class="sb-prog-lbl">Прогресс</span><span class="sb-prog-pct" id="sbPct">0%</span></div>
+      <div class="sb-prog-track"><div class="sb-prog-fill" id="sbFill" style="width:0%"></div></div>
+      <div class="sb-footer-btns">
+        <button class="sb-footer-btn" data-filter="all">📋 Задачи</button>
+        <button class="sb-footer-btn" data-action="close">✕ Закрыть</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="sb-edge-zone" id="sbEdgeZone"></div>
+
+<!-- ── App ───────────────────────────────────────────────── -->
+<div class="app">
+  <div class="header">
+    <div class="header-top">
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="sb-hamburger" id="hamburgerBtn">☰</button>
+        <div class="logo" id="logoBtn" style="cursor:pointer">TaskMgr</div>
+      </div>
+      <div class="header-right">
+        <div class="streak-badge hidden" id="streakBadge">🔥 <span id="streakNum">0</span></div>
+        <button class="icon-btn" id="viewBtn" title="Вид">⊞</button>
+        <button class="icon-btn" id="syncBtn" title="Обновить"><span class="sync-icon">⟳</span></button>
+      </div>
+    </div>
+    <div class="last-sync" id="lastSync"></div>
+  </div>
+  <div class="progress-banner">
+    <div class="progress-label"><span>Прогресс</span><strong id="progressPct">0%</strong></div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="stats">
+    <div class="stat-card total"   data-filter="all"><div class="stat-num" id="statTotal">0</div><div class="stat-label">Всего</div></div>
+    <div class="stat-card doing"   data-filter="doing"><div class="stat-num" id="statDoing">0</div><div class="stat-label">В работе</div></div>
+    <div class="stat-card done"    data-filter="done"><div class="stat-num" id="statDone">0</div><div class="stat-label">Готово</div></div>
+    <div class="stat-card overdue" data-filter="overdue"><div class="stat-num" id="statOverdue">0</div><div class="stat-label">Просроч.</div></div>
+  </div>
+  <div class="ptr" id="ptrBar"><div class="ptr-spinner"></div><span>Обновление...</span></div>
+  <div class="toolbar">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input class="search-input" id="searchInput" placeholder="Поиск задач...">
+    </div>
+    <button class="sort-btn" id="sortBtn">📅 <span id="sortLabel">Дата ↓</span></button>
+    <div class="sort-menu" id="sortMenu" style="display:none">
+      <div class="sort-item" data-sort="date_desc">Дата создания ↓</div>
+      <div class="sort-item" data-sort="date_asc">Дата создания ↑</div>
+      <div class="sort-item" data-sort="deadline">По дедлайну</div>
+      <div class="sort-item" data-sort="priority">По приоритету</div>
+      <div class="sort-item" data-sort="title">По названию</div>
+    </div>
+  </div>
+  <div class="tabs">
+    <button class="tab active" data-filter="all">Все</button>
+    <button class="tab" data-filter="todo">🔵 Новые</button>
+    <button class="tab" data-filter="doing">🟡 В работе</button>
+    <button class="tab" data-filter="done">✅ Готово</button>
+    <button class="tab" data-filter="high">🔴 Срочные</button>
+    <button class="tab" data-filter="overdue">⚠️ Просроч.</button>
+    <button class="tab" data-filter="today">📅 Сегодня</button>
+  </div>
+  <div class="tasks-header">
+    <span class="tasks-title" id="tasksLabel">Все задачи</span>
+    <span class="count-badge" id="tasksCount">0</span>
+  </div>
+  <div id="listView"><div class="tasks-list" id="tasksList"></div></div>
+  <div id="kanbanView" style="display:none"><div class="kanban-board" id="kanbanBoard"></div></div>
+</div>
+
+<!-- ── FAB ───────────────────────────────────────────────── -->
+<button class="fab-main" id="fabBtn" aria-label="Добавить задачу">+</button>
+
+<!-- ── Task Modal ────────────────────────────────────────── -->
+<div class="modal-overlay" id="taskModal">
+  <div class="modal">
+    <div class="modal-drag"><span></span></div>
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">Новая задача</div>
+      <button class="modal-close" id="modalCloseBtn">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Название *</label>
+        <input class="form-input" id="taskTitle" placeholder="Что нужно сделать?" autocomplete="off">
+      </div>
+      <div class="form-group" style="position:relative">
+        <label class="form-label">Описание</label>
+        <div class="link-dialog" id="linkDialog">
+          <input type="text" id="linkUrl"  placeholder="URL (https://...)" autocomplete="off">
+          <input type="text" id="linkText" placeholder="Текст ссылки (необязательно)" autocomplete="off">
+          <div class="link-dialog-btns">
+            <button class="ldb-cancel" onclick="window.RichEditor?.closeLinkDialog()">Отмена</button>
+            <button class="ldb-ok"     onclick="window.RichEditor?.insertLink()">Вставить</button>
+          </div>
+        </div>
+        <div class="editor-wrap" id="editorWrap">
+          <div class="editor-toolbar">
+            <button class="tb-btn" onmousedown="event.preventDefault();window.RichEditor?.execFormat('bold')" title="Жирный (Ctrl+B)"><b>B</b></button>
+            <button class="tb-btn" onmousedown="event.preventDefault();window.RichEditor?.execFormat('italic')" title="Курсив (Ctrl+I)"><i>I</i></button>
+            <button class="tb-btn" onmousedown="event.preventDefault();window.RichEditor?.execFormat('strikeThrough')" title="Зачёркнутый"><s style="font-style:normal">S</s></button>
+            <div class="tb-sep"></div>
+            <button class="tb-btn" onmousedown="event.preventDefault();window.RichEditor?.insertChecklist()" title="Чеклист">☑</button>
+            <button class="tb-btn" onmousedown="event.preventDefault();window.RichEditor?.execFormat('insertUnorderedList')" title="Список">•</button>
+            <button class="tb-btn" onmousedown="event.preventDefault();window.RichEditor?.execFormat('insertOrderedList')" title="Нумерованный">№</button>
+            <div class="tb-sep"></div>
+            <button class="tb-btn" onmousedown="event.preventDefault();window.RichEditor?.openLinkDialog()" title="Ссылка (Ctrl+K)">🔗</button>
+            <button class="tb-btn" onmousedown="event.preventDefault();window.RichEditor?.insertImageUrl()" title="Картинка">🖼</button>
+            <button class="tb-btn" onclick="document.getElementById('imgFileInput').click()" title="Загрузить">📷</button>
+            <button class="tb-btn" onclick="document.getElementById('fileInput').click()" title="Файл">📎</button>
+          </div>
+          <div class="editor-body" id="taskDesc" contenteditable="true"
+               data-ph="Подробности задачи..."
+               onkeydown="window.RichEditor?.handleEditorKeydown(event)"
+               onpaste="window.RichEditor?.handleEditorPaste(event)"></div>
+        </div>
+        <input type="file" id="imgFileInput" accept="image/*" style="display:none" onchange="window.RichEditor?.handleImageFile(this)">
+        <input type="file" id="fileInput"   style="display:none"                  onchange="window.RichEditor?.handleFileAttach(this)">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Статус</label>
+          <select class="form-select" id="taskStatus">
+            <option value="todo">🔵 Новая</option>
+            <option value="doing">🟡 В работе</option>
+            <option value="done">✅ Готово</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Приоритет</label>
+          <select class="form-select" id="taskPriority">
+            <option value="medium">🟡 Средний</option>
+            <option value="high">🔴 Высокий</option>
+            <option value="low">🟢 Низкий</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Дедлайн</label>
+          <input class="form-input" type="date" id="taskDeadline">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Исполнитель</label>
+          <input class="form-input" id="taskAssignee" placeholder="@username">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger"  id="deleteBtn"     style="display:none" onclick="window.ModalsModule?.deleteTask()">🗑</button>
+      <button class="btn btn-ghost"   id="modalCancelBtn">Отмена</button>
+      <button class="btn btn-primary" id="modalSaveBtn">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Detail Panel ──────────────────────────────────────── -->
+<div class="dp-overlay" id="dpOverlay">
+  <div class="dp-panel">
+    <div class="dp-header">
+      <button class="dp-back" id="dpBackBtn">← Назад</button>
+      <div class="dp-header-right">
+        <button class="dp-hbtn" id="dpEditBtn">✏️ Изменить</button>
+        <button class="dp-hbtn" id="dpDeleteBtn" style="color:var(--red)">🗑</button>
+      </div>
+    </div>
+    <div class="dp-title-row">
+      <div class="dp-check" id="dpCheck"></div>
+      <div class="dp-title" id="dpTitle">Название</div>
+    </div>
+    <div class="dp-meta" id="dpMeta"></div>
+    <div id="dpDesc"></div>
+    <div id="dpSubsContainer"></div>
+    <div id="dpComsContainer"></div>
+    <div style="height:60px"></div>
+  </div>
+</div>
+
+<!-- ── Quick Actions ─────────────────────────────────────── -->
+<div class="qa-overlay" id="qaOverlay">
+  <div class="qa-sheet">
+    <div class="qa-drag"><span></span></div>
+    <div class="qa-title">Быстрые действия</div>
+    <div class="qa-task-name" id="qaTaskName"></div>
+    <div class="qa-actions">
+      <button class="qa-btn todo"  id="qaTodoBtn">🔵 Новая</button>
+      <button class="qa-btn doing" id="qaDoingBtn">🟡 В работе</button>
+      <button class="qa-btn done"  id="qaDoneBtn">✅ Выполнено</button>
+      <button class="qa-btn edit"  id="qaEditBtn">✏️ Редактировать</button>
+      <button class="qa-btn del"   id="qaDeleteBtn">🗑 Удалить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast ─────────────────────────────────────────────── -->
+<div class="toast" id="toast"></div>
+
+<!-- ══ SCRIPTS (порядок критичен!) ══════════════════════════
+  1. state.js   — глобальные переменные
+  2. utils.js   — чистые утилиты
+  3. api.js     — сеть + кэши
+  4. Модули     — в правильном порядке
+  5. events.js  — клавиши и поиск
+  6. app.js     — точка входа (последний)
+════════════════════════════════════════════════════════════ -->
+<script src="/js/state.js"></script>
+<script src="/js/utils.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/modules/rich-editor.js"></script>
+<script src="/js/modules/filters.js"></script>
+<script src="/js/modules/render.js"></script>
+<script src="/js/modules/tasks.js"></script>
+<script src="/js/modules/modals.js"></script>
+<script src="/js/modules/sidebar.js"></script>
+<script src="/js/modules/details.js"></script>
+<script src="/js/modules/notifications.js"></script>
+<script src="/js/events.js"></script>
+<script src="/js/app.js"></script>
+
+</body>
+</html>
