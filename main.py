@@ -50,7 +50,7 @@ SCOPES = [
 
 COLUMNS = [
     "ID", "Title", "Description", "Status", "Priority",
-    "Deadline", "Assignee", "UserID", "UserName", "CreatedAt", "UpdatedAt"
+    "Deadline", "Assignee", "UserID", "UserName", "CreatedAt", "UpdatedAt", "CompletedAt"
 ]
 
 STATUS_RU   = {"todo": "Новая",   "doing": "В работе", "done": "Готово"}
@@ -94,6 +94,7 @@ def row_to_task(row: list) -> dict:
         "deadline": g(5), "assignee": g(6),
         "user_id": g(7), "user_name": g(8),
         "created_at": g(9), "updated_at": g(10),
+        "completed_at": g(11),   # ← дата выполнения
     }
 
 def get_all_tasks():
@@ -198,7 +199,7 @@ async def create_task(task: TaskCreate, x_user_id: str = Header(default="")):
         s.append_row([tid, task.title, task.description,
                       STATUS_RU.get(task.status, task.status),
                       PRIO_RU.get(task.priority, task.priority),
-                      task.deadline, task.assignee, uid, task.user_name, now, now])
+                      task.deadline, task.assignee, uid, task.user_name, now, now, ""])
         new = {"id":tid,"title":task.title,"description":task.description,"status":task.status,
                "priority":task.priority,"deadline":task.deadline,"assignee":task.assignee,
                "user_id":uid,"user_name":task.user_name,"created_at":now,"updated_at":now}
@@ -226,12 +227,19 @@ async def update_task(tid: str, upd: TaskUpdate, x_user_id: str = Header(default
         if upd.assignee    is not None: s.update_cell(idx,7,upd.assignee);         old["assignee"]!=upd.assignee and changes.append(f"Исполнитель → {upd.assignee or '—'}")
         now = datetime.now().isoformat(timespec="seconds"); s.update_cell(idx,11,now)
 
+        # ✅ Записываем дату выполнения
+        if upd.status == "done" and old["status"] != "done":
+            s.update_cell(idx, 12, now)   # CompletedAt = now
+        elif upd.status in ("todo","doing") and old["status"] == "done":
+            s.update_cell(idx, 12, "")    # Сброс если вернули в работу
+
         updated = {**old, **{k:v for k,v in {"title":upd.title,"description":upd.description,"status":upd.status,"priority":upd.priority,"deadline":upd.deadline,"assignee":upd.assignee}.items() if v is not None}}
         uid = upd.user_id or x_user_id
         if changes:
             _log(uid, upd.user_name, "UPDATE", tid, upd.title or old["title"], "; ".join(changes))
             await _notify("update", updated, changes)
         if upd.status == "done" and old["status"] != "done":
+            updated["completed_at"] = now
             await _notify("done", updated)
         return {"success": True}
     except HTTPException: raise
