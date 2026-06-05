@@ -453,22 +453,29 @@ async def setup_webhook_endpoint():
     if not SERVER_URL:
         return {"error": "SERVER_URL не задан в переменных окружения Railway"}
     webhook_url = f"{SERVER_URL}/webhook/{BOT_TOKEN}"
+    # Маскируем токен в ответе — никогда не показываем полный токен!
+    safe_url = f"{SERVER_URL}/webhook/{BOT_TOKEN[:6]}***"
     try:
         result = await bot.set_webhook(url=webhook_url, drop_pending_updates=True)
-        info   = await bot.get_webhook_info()
-        return {"success": result, "webhook_url": webhook_url, "info": str(info)}
+        return {"success": result, "webhook_url": safe_url, "status": "Webhook активен"}
     except Exception as e:
         return {"error": str(e)}
 
 @app.get("/webhook_info")
 async def webhook_info():
-    """Проверь текущий статус webhook."""
+    """Проверь текущий статус webhook (токен скрыт)."""
     try:
         info = await bot.get_webhook_info()
+        # Маскируем URL — токен никогда не показываем
+        url_safe = ""
+        if info.url:
+            parts = info.url.split("/webhook/")
+            url_safe = parts[0] + "/webhook/***" if len(parts) > 1 else "активен"
         return {
-            "url": info.url,
-            "pending_update_count": info.pending_update_count,
-            "last_error": info.last_error_message,
+            "webhook": "активен" if info.url else "не настроен",
+            "webhook_url": url_safe,
+            "pending_updates": info.pending_update_count,
+            "last_error": info.last_error_message or "нет ошибок",
             "MY_TELEGRAM_ID": MY_TELEGRAM_ID,
             "notify_chat_id": _get_notify_chat_id(),
         }
