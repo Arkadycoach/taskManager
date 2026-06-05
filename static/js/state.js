@@ -45,9 +45,10 @@ window.FILTER_LABELS = {
 window.PRIORITY_ORDER = { high: 0, medium: 1, low: 2 };
 
 window.SORT_LABELS = {
-  date_desc: 'Дата ↓',
-  date_asc:  'Дата ↑',
-  deadline:  'Дедлайн',
-  priority:  'Приоритет',
-  title:     'Название',
+  date_desc:  'Дата ↓',
+  date_asc:   'Дата ↑',
+  deadline:   'Дедлайн',
+  priority:   'Приоритет',
+  title:      'Название',
+  completed:  'Дата выполнения',
 };
