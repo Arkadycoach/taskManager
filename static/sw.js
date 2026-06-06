@@ -2,7 +2,7 @@
  * Service Worker — Task Manager PWA
  * Обеспечивает офлайн-доступ к оболочке приложения
  */
-const CACHE   = 'taskmanager-v1';
+const CACHE   = 'taskmanager-v2';
 const OFFLINE = '/offline.html';
 
 // Файлы для кэширования при установке
@@ -35,7 +35,10 @@ const PRECACHE = [
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE)
-      .then(c => c.addAll(PRECACHE))
+      .then(c => {
+        // addAll fails if any item 404s — use individual adds
+        return Promise.allSettled(PRECACHE.map(url => c.add(url).catch(() => {})));
+      })
       .then(() => self.skipWaiting())
   );
 });
