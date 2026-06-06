@@ -2005,19 +2005,32 @@ body {
 .dp-com-send{margin-top:8px;background:var(--blue);color:#fff;border:none;border-radius:9px;padding:9px 16px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px}
 
   </style>
+  <meta name="app-version" content="202606060219">
   <script>
-    // SW только на реальном HTTPS сервере (не в Claude/localhost)
+    // ── Cache buster: сбрасываем старый SW при обновлении ──
+    const _APP_VERSION = '202606060219';
     const _realHost = !location.hostname.includes('claudeusercontent') &&
                       !location.hostname.includes('localhost') &&
                       !location.hostname.includes('127.0.0.1') &&
                       location.protocol === 'https:';
+
     if ('serviceWorker' in navigator && _realHost) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-          .then(r => console.log('✅ SW:', r.scope))
+      window.addEventListener('load', async () => {
+        // Сначала проверяем все существующие SW и обновляем
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const reg of regs) {
+          await reg.update();
+        }
+        // Регистрируем/обновляем SW
+        navigator.serviceWorker.register('/sw.js?v=202606060219')
+          .then(r => {
+            console.log('✅ SW v202606060219:', r.scope);
+            r.update(); // Принудительное обновление
+          })
           .catch(e => console.warn('SW skip:', e.message));
       });
     }
+
     if (location.search.includes('action=add')) {
       window.addEventListener('load', () => setTimeout(() => window.ModalsModule?.openAdd(), 700));
     }
