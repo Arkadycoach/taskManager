@@ -16,8 +16,9 @@ from typing import Optional
 
 import gspread
 import httpx
-from fastapi import FastAPI, HTTPException, Header, Request
+from fastapi import FastAPI, HTTPException, Header, Request, Response
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from google.oauth2.service_account import Credentials
 from pydantic import BaseModel
@@ -1002,6 +1003,23 @@ def _log(uid, uname, action, tid, title, changes):
         ])
     except Exception as e:
         logger.warning(f"log: {e}")
+
+# ── Serve index.html with no-cache headers ──────────────────
+# Телефоны агрессивно кэшируют — принудительно отдаём свежую версию
+@app.get("/", include_in_schema=False)
+@app.get("/index.html", include_in_schema=False)
+async def serve_index():
+    _static = _os.path.join(_os.path.dirname(__file__), "static")
+    index   = _os.path.join(_static, "index.html")
+    if _os.path.exists(index):
+        return FileResponse(
+            index,
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+                "Pragma":        "no-cache",
+                "Expires":       "0",
+            }
+        )
 
 # ══ Serve frontend static files ════════════════════════════
 # Всё в папке static/ доступно по URL /
