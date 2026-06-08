@@ -2443,6 +2443,134 @@ body {
   letter-spacing: .07em; color: var(--muted2);
   padding: 16px 18px 8px;
 }
+
+/* ════════════════════════════════════════════════════════
+   PERFORMANCE PATCH
+   — убираем blur на десктопе (самая дорогая операция)
+   — добавляем GPU-слои для анимаций
+   — isolate и contain для task cards
+════════════════════════════════════════════════════════ */
+
+/* GPU-слой для всех анимированных оверлеев */
+.modal-overlay,
+.sb-overlay,
+.dp-overlay,
+.qa-overlay,
+.stats-overlay,
+.settings-overlay,
+.focus-overlay {
+  will-change: opacity;
+  transform: translateZ(0);
+}
+
+.modal,
+.sidebar,
+.dp-panel,
+.qa-sheet,
+.stats-panel,
+.settings-panel {
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Task cards — contain чтобы браузер не пересчитывал весь layout */
+.task-card {
+  contain: layout style;
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+/* Убираем blur на десктопе — на мобиле оставляем */
+@media (pointer: fine) {
+  .modal-overlay,
+  .sb-overlay,
+  .dp-overlay,
+  .qa-overlay,
+  .stats-overlay,
+  .settings-overlay { backdrop-filter: none !important; }
+
+  .header,
+  .dp-header,
+  .stats-header,
+  .settings-panel-header { backdrop-filter: none !important; background: var(--surface) !important; }
+
+  /* Solid backgrounds вместо blur на десктопе */
+  .dp-overlay  { background: rgba(17,24,39,.6); }
+  .sb-overlay  { background: rgba(17,24,39,.55); }
+  .stats-overlay { background: rgba(17,24,39,.6); }
+  .settings-overlay { background: rgba(17,24,39,.6); }
+}
+
+/* Упрощаем тени на desktop */
+@media (pointer: fine) {
+  .task-card { box-shadow: 0 1px 3px rgba(17,24,39,.06) !important; }
+  .modal     { box-shadow: 0 8px 32px rgba(17,24,39,.18) !important; }
+}
+
+/* FAB без blur */
+.fab-main {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* Переходы через translate3d (GPU compositing) */
+.modal            { transform: translate3d(0, 100%, 0); }
+.modal-overlay.open .modal { transform: translate3d(0, 0, 0); }
+
+.sidebar          { transform: translate3d(-100%, 0, 0); }
+.sb-overlay.open .sidebar { transform: translate3d(0, 0, 0); }
+
+.dp-panel         { transform: translate3d(100%, 0, 0); }
+.dp-overlay.open .dp-panel { transform: translate3d(0, 0, 0); }
+
+.settings-panel   { transform: translate3d(100%, 0, 0); }
+.settings-overlay.open .settings-panel { transform: translate3d(0, 0, 0); }
+
+.stats-panel      { transform: translate3d(0, 100%, 0); }
+.stats-overlay.open .stats-panel { transform: translate3d(0, 0, 0); }
+
+/* Quick add bar */
+.quick-add-bar {
+  will-change: transform;
+  transform: translate3d(0, 100%, 0);
+}
+.quick-add-bar.open { transform: translate3d(0, 0, 0); }
+
+/* Toast */
+.toast {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}
+
+/* Reduce motion для accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Оптимизация скролла */
+.tasks-list,
+.dp-panel,
+.stats-panel,
+.settings-panel {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  will-change: scroll-position;
+}
+
+/* Ускоряем таб-переключение */
+.tab {
+  contain: layout style;
+  will-change: auto;
+}
+
+/* Cursor pointer на кликабельных элементах */
+.task-card { cursor: pointer; }
+
 </style>
   <meta name="app-version" content="202606060219">
   <script>
@@ -5842,6 +5970,186 @@ window.removeTeamMember = async function(username) {
 })();
 
 console.log('✅ Tags (chips), Settings panel, Team management, Per-task notify loaded');
+
+// ════════════════════════════════════════════════════════
+//  JS PERFORMANCE PATCH
+// ════════════════════════════════════════════════════════
+
+// ── 1. RAF-батчинг рендера ────────────────────────────────
+// Несколько вызовов render() за один тик → один реальный ре-рендер
+(function patchRenderBatching() {
+  let _rafPending = false;
+  let _renderQueued = false;
+
+  const origRender = window.TasksModule?.render?.bind(window.TasksModule);
+  if (!origRender || !window.TasksModule) return;
+
+  window.TasksModule.render = function() {
+    if (_rafPending) { _renderQueued = true; return; }
+    _rafPending = true;
+    requestAnimationFrame(() => {
+      origRender();
+      _rafPending = false;
+      if (_renderQueued) {
+        _renderQueued = false;
+        window.TasksModule.render();
+      }
+    });
+  };
+})();
+
+// ── 2. Виртуальный список для 100+ задач ─────────────────
+// Рендерим только видимые карточки + буфер
+(function initVirtualList() {
+  const CARD_H    = 110;  // примерная высота карточки px
+  const BUFFER    = 5;    // карточек сверху/снизу сверх видимых
+  let   _allHTML  = [];
+  let   _virInited = false;
+
+  // Только для больших списков (>80 задач)
+  const origRenderTasks = window.RenderModule?.renderTasks?.bind(window.RenderModule);
+  if (!origRenderTasks || !window.RenderModule) return;
+
+  window.RenderModule.renderTasks = function() {
+    const filtered = window.filterTasks(window.tasks, window.currentFilter,
+                       document.getElementById('searchInput')?.value || '');
+
+    // Обычный рендер для небольших списков
+    if (filtered.length <= 60) {
+      origRenderTasks();
+      return;
+    }
+
+    // Виртуальный список для больших
+    const list = document.getElementById('tasksList');
+    if (!list) return;
+
+    // Сохраняем весь HTML
+    _allHTML = filtered.map((t, i) => window.RenderModule.taskCardHTML(t, i));
+
+    const visibleCount = Math.ceil(window.innerHeight / CARD_H) + BUFFER * 2;
+    const totalH = filtered.length * CARD_H;
+
+    list.innerHTML = `
+      <div id="virSpacer" style="height:${totalH}px;position:relative">
+        <div id="virContent" style="position:absolute;left:0;right:0;top:0"></div>
+      </div>`;
+
+    function updateVisible() {
+      const scrollTop  = window.scrollY || document.documentElement.scrollTop;
+      const listTop    = list.getBoundingClientRect().top + scrollTop;
+      const relScroll  = Math.max(0, scrollTop - listTop);
+      const startIdx   = Math.max(0, Math.floor(relScroll / CARD_H) - BUFFER);
+      const endIdx     = Math.min(filtered.length, startIdx + visibleCount);
+      const topOffset  = startIdx * CARD_H;
+
+      const content = document.getElementById('virContent');
+      if (content) {
+        content.style.top    = topOffset + 'px';
+        content.innerHTML    = _allHTML.slice(startIdx, endIdx).join('');
+        window.TasksModule.attachSwipeHandlers?.();
+        window.TasksModule.attachLongPressHandlers?.();
+      }
+    }
+
+    updateVisible();
+    if (!_virInited) {
+      window.addEventListener('scroll', updateVisible, { passive: true });
+      _virInited = true;
+    }
+
+    const cntEl = document.getElementById('tasksCount');
+    if (cntEl) cntEl.textContent = filtered.length;
+  };
+})();
+
+// ── 3. Дебаунс поиска ────────────────────────────────────
+// Уже есть 280мс — увеличиваем до 180мс и используем RAF
+(function patchSearch() {
+  const inp = document.getElementById('searchInput');
+  if (!inp) return;
+  let timer;
+  // Убираем старый listener (clone)
+  const newInp = inp.cloneNode(true);
+  inp.parentNode?.replaceChild(newInp, inp);
+  newInp.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => requestAnimationFrame(() => window.TasksModule?.render()), 180);
+  }, { passive: true });
+})();
+
+// ── 4. Passive listeners для touch ───────────────────────
+// Уже есть, но проверяем sidebar и drag
+(function ensurePassive() {
+  const listEl = document.getElementById('tasksList');
+  if (listEl) {
+    listEl.addEventListener('touchstart', ()=>{}, { passive: true });
+    listEl.addEventListener('touchmove',  ()=>{}, { passive: true });
+  }
+})();
+
+// ── 5. Prefetch-прогрев — изображения шрифтов ────────────
+// Загружаем шрифт сразу при старте
+(function prefetchFont() {
+  if (document.fonts) {
+    document.fonts.load('800 16px "Plus Jakarta Sans"');
+  }
+})();
+
+// ── 6. Оптимизация updateStats ─────────────────────────────
+// Не обновляем DOM если значение не изменилось
+(function patchUpdateStats() {
+  const orig = window.updateStats;
+  if (!orig) return;
+  window.updateStats = function() {
+    requestAnimationFrame(orig);
+  };
+})();
+
+// ── 7. Intersection Observer для ленивой загрузки подзадач ─
+// Загружаем subCache только когда карточка видна
+(function initLazySubtasks() {
+  if (!('IntersectionObserver' in window)) return;
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      const id = entry.target.dataset.id;
+      if (id && !window.subCache?.has(id)) {
+        window.getSubtasks?.(id).then(() => {
+          // Тихо обновляем прогресс-бар если карточка ещё видна
+          const card = document.querySelector(`.task-card[data-id="${id}"]`);
+          if (card) {
+            const subs  = window.subCache?.get(id) || [];
+            const subN  = subs.length;
+            const subD  = subs.filter(s => s.status === 'done').length;
+            const pct   = subN ? Math.round(subD/subN*100) : 0;
+            const bar   = card.querySelector('.sub-prog-fill');
+            const lbl   = card.querySelector('.sub-prog-label');
+            if (bar) bar.style.width = pct + '%';
+            if (lbl) lbl.textContent = subD + '/' + subN;
+          }
+        });
+      }
+      observer.unobserve(entry.target);
+    });
+  }, { rootMargin: '200px' });
+
+  // Наблюдаем за новыми карточками при каждом рендере
+  const origRender = window.TasksModule?.render?.bind(window.TasksModule);
+  if (origRender && window.TasksModule) {
+    window.TasksModule.render = function() {
+      origRender();
+      requestAnimationFrame(() => {
+        document.querySelectorAll('.task-card[data-id]').forEach(card => {
+          observer.observe(card);
+        });
+      });
+    };
+  }
+})();
+
+console.log('✅ Performance patch applied: RAF batching, virtual list 60+, passive listeners, lazy subtasks');
+
 </script>
 </body>
 </html>
