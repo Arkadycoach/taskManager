@@ -2335,7 +2335,115 @@ body {
 
 .task-tags { display:flex; flex-wrap:wrap; gap:4px; padding: 6px 0 2px 34px; }
 
-  </style>
+  
+/* ── Chip tag input ──────────────────────────────────────── */
+.chip-input-wrap {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  min-height: 40px; padding: 6px 10px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface2); cursor: text;
+  transition: border-color .2s;
+}
+.chip-input-wrap:focus-within { border-color: var(--blue); }
+.chip-input-wrap .input-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--blue-soft); color: var(--blue);
+  border: 1px solid color-mix(in srgb, var(--blue) 30%, transparent);
+  border-radius: 6px; padding: 3px 8px 3px 9px;
+  font-size: 12px; font-weight: 700; white-space: nowrap;
+}
+.chip-input-wrap .input-chip::before { content: "#"; opacity: .6; font-size: 10px; }
+.chip-input-wrap .chip-x {
+  background: none; border: none; cursor: pointer;
+  color: var(--blue); font-size: 14px; line-height: 1;
+  padding: 0 1px; opacity: .6;
+}
+.chip-input-wrap .chip-x:hover { opacity: 1; }
+.chip-input-wrap .chip-text-inp {
+  border: none; outline: none; background: none;
+  font-family: inherit; font-size: 13px; color: var(--text);
+  min-width: 80px; flex: 1; padding: 2px 0;
+}
+.chip-hint {
+  font-size: 11px; color: var(--muted2); margin-top: 4px;
+  display: flex; align-items: center; gap: 5px;
+}
+/* ── Per-task notification toggle ───────────────────────── */
+.notify-toggle-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 0 4px; border-top: 1px solid var(--border); margin-top: 8px;
+}
+.notify-toggle-label { font-size: 13px; font-weight: 600; color: var(--text2); }
+.notify-toggle-label span { font-size: 11px; color: var(--muted2); font-weight: 400; display: block; margin-top: 1px; }
+/* ── Settings sidebar panel ─────────────────────────────── */
+.settings-overlay {
+  position: fixed; inset: 0; background: rgba(17,24,39,.5);
+  backdrop-filter: blur(6px); z-index: 130;
+  opacity: 0; pointer-events: none; transition: opacity .28s;
+}
+.settings-overlay.open { opacity: 1; pointer-events: all; }
+.settings-panel {
+  position: absolute; right: 0; top: 0; bottom: 0; width: min(360px, 100vw);
+  background: var(--bg); overflow-y: auto;
+  transform: translateX(100%);
+  transition: transform .32s var(--ease);
+  box-shadow: -4px 0 24px rgba(17,24,39,.15);
+}
+.settings-overlay.open .settings-panel { transform: translateX(0); }
+.settings-panel-header {
+  position: sticky; top: 0; background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 18px; display: flex; align-items: center; gap: 12px;
+}
+.settings-panel-header h3 { flex: 1; font-size: 17px; font-weight: 800; }
+.notif-row {
+  display: flex; align-items: center; padding: 14px 18px;
+  border-bottom: 1px solid var(--border); gap: 12px;
+}
+.notif-row-info { flex: 1; }
+.notif-row-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.notif-row-desc  { font-size: 11px; color: var(--muted2); margin-top: 2px; }
+.team-member-row {
+  display: flex; align-items: center; padding: 12px 18px;
+  border-bottom: 1px solid var(--border); gap: 10px;
+}
+.team-av {
+  width: 36px; height: 36px; border-radius: 10px;
+  background: var(--blue-soft); color: var(--blue);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 800; flex-shrink: 0;
+}
+.team-info { flex: 1; }
+.team-name { font-size: 13px; font-weight: 700; color: var(--text); }
+.team-username { font-size: 11px; color: var(--muted2); }
+.team-remove {
+  background: none; border: none; color: var(--muted2);
+  cursor: pointer; font-size: 16px; padding: 4px;
+  border-radius: 6px; transition: all var(--fast);
+}
+.team-remove:hover { color: var(--red); background: var(--red-soft); }
+.add-member-form {
+  padding: 14px 18px; background: var(--surface2);
+  border: 1px solid var(--border); border-radius: 12px; margin: 12px 16px;
+}
+.add-member-form input {
+  width: 100%; border: 1px solid var(--border); border-radius: 8px;
+  padding: 9px 12px; font-family: inherit; font-size: 13px;
+  background: var(--surface); color: var(--text); margin-bottom: 8px;
+  box-sizing: border-box; outline: none;
+}
+.add-member-form input:focus { border-color: var(--blue); }
+.add-member-btn {
+  width: 100%; background: var(--blue); color: #fff; border: none;
+  border-radius: 9px; padding: 10px; font-family: inherit;
+  font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.settings-section-title {
+  font-size: 10px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--muted2);
+  padding: 16px 18px 8px;
+}
+</style>
   <meta name="app-version" content="202606060219">
   <script>
     // ── Cache buster: сбрасываем старый SW при обновлении ──
@@ -2581,10 +2689,15 @@ body {
           <input class="form-input" id="taskAssignee" placeholder="@username">
         </div>
       </div>
-      <!-- Теги -->
+      <!-- Теги — chip input -->
       <div class="form-group">
-        <label class="form-label">Теги <span style="color:var(--muted2);font-weight:400">(через запятую)</span></label>
-        <input class="form-input" id="taskTags" placeholder="работа, клиент, срочно" autocomplete="off">
+        <label class="form-label">Теги</label>
+        <div class="chip-input-wrap" id="chipInputWrap" onclick="document.getElementById('chipTextInput').focus()">
+          <!-- chips injected here by JS -->
+          <input class="chip-text-inp" id="chipTextInput" placeholder="Добавь тег..." autocomplete="off" maxlength="30">
+        </div>
+        <div class="chip-hint">⌨️ Введи тег → нажми <kbd style="background:var(--surface3);padding:1px 5px;border-radius:4px;font-size:10px">Enter</kbd> или <kbd style="background:var(--surface3);padding:1px 5px;border-radius:4px;font-size:10px">,</kbd> чтобы добавить</div>
+        <input type="hidden" id="taskTags">
       </div>
       <!-- Повторяемость -->
       <div class="form-group">
@@ -2596,6 +2709,14 @@ body {
           <option value="monthly">🗓 Ежемесячно</option>
           <option value="yearly">📆 Ежегодно</option>
         </select>
+      </div>
+      <!-- Per-task notification toggle -->
+      <div class="notify-toggle-row">
+        <div class="notify-toggle-label">
+          🔔 Уведомления в Telegram
+          <span>Получать уведомления об этой задаче</span>
+        </div>
+        <div class="toggle-switch on" id="taskNotifyToggle" onclick="this.classList.toggle('on')"></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -5256,6 +5377,10 @@ window.apiCall = async function(method, endpoint, body = null) {
             <span class="sb-icon">📤</span>
             <span class="sb-label">Экспорт CSV</span>
           </div>
+          <div class="sb-nav-item" id="sbSettingsBtn" onclick="closeSidebar?.();openSettings()">
+            <span class="sb-icon">⚙️</span>
+            <span class="sb-label">Настройки и команда</span>
+          </div>
         </div>
       </div>`;
     sbBody.appendChild(div);
@@ -5353,6 +5478,45 @@ console.log('✅ All features loaded: dark mode, quick add, undo, priority cycle
 
 </script>
 
+<!-- ════════════ SETTINGS PANEL ════════════ -->
+<div class="settings-overlay" id="settingsOverlay">
+  <div class="settings-panel">
+    <div class="settings-panel-header">
+      <h3>⚙️ Настройки</h3>
+      <button class="stats-close" onclick="closeSettings()">✕</button>
+    </div>
+
+    <!-- Уведомления -->
+    <div class="settings-section-title">Уведомления в Telegram</div>
+    <div id="notifSettingsList">
+      <!-- заполняется JS -->
+    </div>
+
+    <div style="padding:12px 18px;background:var(--surface2);margin:0 16px 16px;border-radius:12px;font-size:12px;color:var(--muted2);line-height:1.6">
+      Настройки сохраняются в Google Sheets и синхронизируются с ботом.<br>
+      Также управляй через бот: <strong>/settings</strong>
+    </div>
+
+    <!-- Команда -->
+    <div class="settings-section-title">Команда</div>
+    <div id="teamMembersList"><!-- заполняется JS --></div>
+
+    <div class="add-member-form">
+      <div style="font-size:12px;font-weight:700;color:var(--muted2);margin-bottom:10px">
+        ➕ Добавить участника команды
+      </div>
+      <input id="addMemberName"     placeholder="Имя (Иван)" autocomplete="off">
+      <input id="addMemberUsername" placeholder="@username в Telegram" autocomplete="off">
+      <input id="addMemberTgId"     placeholder="Telegram ID (узнать у @userinfobot)" autocomplete="off" type="number">
+      <button class="add-member-btn" onclick="addTeamMember()">Добавить</button>
+      <div style="font-size:11px;color:var(--muted2);margin-top:8px;text-align:center">
+        После добавления участник будет получать<br>уведомления при назначении ему задач
+      </div>
+    </div>
+    <div style="height:40px"></div>
+  </div>
+</div>
+
 <!-- ════════════ DARK MODE BUTTON in header ════════════ -->
 <!-- (injected via JS into header-right) -->
 
@@ -5412,5 +5576,272 @@ console.log('✅ All features loaded: dark mode, quick add, undo, priority cycle
 <!-- ════════════ OFFLINE BANNER ════════════ -->
 <div class="offline-banner" id="offlineBanner">📵 Нет соединения — изменения сохранены и синхронизируются при подключении</div>
 
+</body>
+</html><!-- INJECTED FEATURES: chip tags, settings, team, per-task notify -->
+<script>
+// ════════════════════════════════════════════════════════
+//  CHIP TAG INPUT
+// ════════════════════════════════════════════════════════
+let _currentTags = [];
+
+function _initChipInput() {
+  const wrap = document.getElementById('chipInputWrap');
+  const inp  = document.getElementById('chipTextInput');
+  const hidden = document.getElementById('taskTags');
+  if (!inp) return;
+
+  inp.addEventListener('keydown', e => {
+    if ((e.key === 'Enter' || e.key === ',') && inp.value.trim()) {
+      e.preventDefault();
+      _addChip(inp.value.replace(/,/g,'').trim());
+      inp.value = '';
+    }
+    if (e.key === 'Backspace' && !inp.value && _currentTags.length) {
+      _removeChip(_currentTags[_currentTags.length - 1]);
+    }
+  });
+
+  inp.addEventListener('blur', () => {
+    if (inp.value.trim()) {
+      _addChip(inp.value.replace(/,/g,'').trim());
+      inp.value = '';
+    }
+  });
+}
+
+function _addChip(tag) {
+  if (!tag || _currentTags.includes(tag) || _currentTags.length >= 8) return;
+  _currentTags.push(tag);
+  _renderChips();
+}
+
+function _removeChip(tag) {
+  _currentTags = _currentTags.filter(t => t !== tag);
+  _renderChips();
+}
+
+function _renderChips() {
+  const wrap   = document.getElementById('chipInputWrap');
+  const inp    = document.getElementById('chipTextInput');
+  const hidden = document.getElementById('taskTags');
+  if (!wrap || !inp) return;
+
+  // Remove existing chips
+  wrap.querySelectorAll('.input-chip').forEach(c => c.remove());
+
+  // Re-insert chips before the input
+  _currentTags.forEach(tag => {
+    const chip = document.createElement('span');
+    chip.className = 'input-chip';
+    chip.innerHTML = window.escHtml(tag) +
+      `<button class="chip-x" onclick="_removeChip('${window.escAttr(tag)}')">×</button>`;
+    wrap.insertBefore(chip, inp);
+  });
+
+  // Update hidden field
+  if (hidden) hidden.value = _currentTags.join(',');
+
+  // Update placeholder
+  inp.placeholder = _currentTags.length ? 'Ещё тег...' : 'Добавь тег...';
+}
+
+function _setChips(tagsArr) {
+  _currentTags = Array.isArray(tagsArr) ? [...tagsArr] : 
+                 (typeof tagsArr === 'string' ? tagsArr.split(',').map(t=>t.trim()).filter(Boolean) : []);
+  _renderChips();
+}
+
+function _getChips() {
+  return [..._currentTags];
+}
+
+// Init on DOM ready
+document.addEventListener('DOMContentLoaded', _initChipInput);
+if (document.readyState !== 'loading') _initChipInput();
+
+// Patch openAdd to reset chips
+const _origOpenAdd = window.ModalsModule?.openAdd?.bind(window.ModalsModule);
+if (window.ModalsModule) {
+  window.ModalsModule.openAdd = function() {
+    _origOpenAdd?.();
+    setTimeout(() => { _setChips([]); _initChipInput(); }, 50);
+  };
+}
+
+// Patch openEdit to load chips
+const _origOpenEdit = window.ModalsModule?.openEdit?.bind(window.ModalsModule);
+if (window.ModalsModule) {
+  window.ModalsModule.openEdit = function(id) {
+    _origOpenEdit?.(id);
+    setTimeout(() => {
+      const task = window.tasks?.find(t => t.id === id);
+      if (task) {
+        _setChips(task.tags || []);
+        // Set notify toggle
+        const toggle = document.getElementById('taskNotifyToggle');
+        if (toggle) toggle.classList.toggle('on', task.notify !== false);
+      }
+      _initChipInput();
+    }, 50);
+  };
+}
+
+// Patch save to use chips + notify
+const _origSave = window.ModalsModule?.save?.bind(window.ModalsModule);
+if (window.ModalsModule) {
+  window.ModalsModule.save = async function() {
+    // Inject chip tags into hidden field
+    const hidden = document.getElementById('taskTags');
+    if (hidden) hidden.value = _getChips().join(',');
+    // Inject notify flag
+    const notifyToggle = document.getElementById('taskNotifyToggle');
+    window._pendingNotify = notifyToggle ? notifyToggle.classList.contains('on') : true;
+    await _origSave?.();
+  };
+}
+
+// ════════════════════════════════════════════════════════
+//  SETTINGS PANEL
+// ════════════════════════════════════════════════════════
+const API_URL = 'https://taskmanager-production-6032.up.railway.app';
+
+// Local notification settings cache (synced with backend)
+let _localNotifSettings = {
+  morning:   true,
+  tomorrow:  true,
+  stale:     true,
+  weekly:    true,
+  on_create: true,
+  on_done:   true,
+  on_update: false,
+};
+const NOTIF_LABELS = {
+  morning:   { label: 'Утренний дайджест',    desc: 'Каждое утро в 9:00 — просрочки, дедлайны, план на день' },
+  tomorrow:  { label: 'Дедлайны завтра',      desc: 'Каждый вечер в 20:00 — что нужно сделать завтра' },
+  stale:     { label: 'Застрявшие задачи',    desc: 'В 10:00 — задачи "В работе" без движения 3+ дней' },
+  weekly:    { label: 'Итоги недели',         desc: 'Пятница 18:00 — выполнено, в работе, план на след. неделю' },
+  on_create: { label: 'Новые задачи',         desc: 'При создании любой задачи' },
+  on_done:   { label: 'Выполненные задачи',   desc: 'Когда задача отмечается выполненной' },
+  on_update: { label: 'Изменения задач',      desc: 'При редактировании (может быть много уведомлений)' },
+};
+
+let _teamMembers = [];
+
+window.openSettings = function() {
+  document.getElementById('settingsOverlay')?.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  _renderNotifSettings();
+  _renderTeamMembers();
+};
+
+window.closeSettings = function() {
+  document.getElementById('settingsOverlay')?.classList.remove('open');
+  document.body.style.overflow = '';
+};
+
+function _renderNotifSettings() {
+  const list = document.getElementById('notifSettingsList');
+  if (!list) return;
+  list.innerHTML = Object.entries(NOTIF_LABELS).map(([key, {label, desc}]) => {
+    const on = _localNotifSettings[key];
+    return `
+      <div class="notif-row">
+        <div class="notif-row-info">
+          <div class="notif-row-title">${label}</div>
+          <div class="notif-row-desc">${desc}</div>
+        </div>
+        <div class="toggle-switch ${on?'on':''}" onclick="toggleNotifSetting('${key}', this)"></div>
+      </div>`;
+  }).join('');
+}
+
+window.toggleNotifSetting = async function(key, el) {
+  el.classList.toggle('on');
+  _localNotifSettings[key] = el.classList.contains('on');
+  // Sync to backend via settings endpoint
+  try {
+    await fetch(API_URL + '/settings/notification', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-User-Id': window.userId },
+      body: JSON.stringify({ key, value: _localNotifSettings[key] })
+    });
+  } catch(e) {
+    console.warn('Settings sync:', e);
+  }
+};
+
+function _renderTeamMembers() {
+  const list = document.getElementById('teamMembersList');
+  if (!list) return;
+  if (!_teamMembers.length) {
+    list.innerHTML = '<div style="padding:12px 18px;font-size:13px;color:var(--muted2)">Участников нет. Добавь первого!</div>';
+    return;
+  }
+  list.innerHTML = _teamMembers.map(m => `
+    <div class="team-member-row">
+      <div class="team-av">${(m.name||'?').slice(0,1).toUpperCase()}</div>
+      <div class="team-info">
+        <div class="team-name">${window.escHtml(m.name||'')}</div>
+        <div class="team-username">@${window.escHtml(m.username||'')} · ID: ${m.telegram_id}</div>
+      </div>
+      <button class="team-remove" onclick="removeTeamMember('${window.escAttr(m.username||'')}')">✕</button>
+    </div>`).join('');
+}
+
+window.addTeamMember = async function() {
+  const name     = document.getElementById('addMemberName')?.value.trim();
+  const username = document.getElementById('addMemberUsername')?.value.trim().replace('@','');
+  const tgId     = document.getElementById('addMemberTgId')?.value.trim();
+  if (!name || !username || !tgId) {
+    window.showToast?.('Заполни все поля', 'error'); return;
+  }
+  if (isNaN(parseInt(tgId))) {
+    window.showToast?.('Telegram ID должен быть числом', 'error'); return;
+  }
+  const member = { name, username, telegram_id: parseInt(tgId) };
+  _teamMembers.push(member);
+  _renderTeamMembers();
+  // Clear form
+  ['addMemberName','addMemberUsername','addMemberTgId'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  // Save to backend
+  try {
+    await fetch(API_URL + '/settings/team', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-User-Id': window.userId },
+      body: JSON.stringify(member)
+    });
+    window.showToast?.('✓ ' + name + ' добавлен', 'success');
+  } catch(e) {
+    window.showToast?.('Ошибка сохранения', 'error');
+  }
+};
+
+window.removeTeamMember = async function(username) {
+  _teamMembers = _teamMembers.filter(m => m.username !== username);
+  _renderTeamMembers();
+  try {
+    await fetch(API_URL + '/settings/team/' + username, {
+      method: 'DELETE', headers: { 'X-User-Id': window.userId }
+    });
+    window.showToast?.('Участник удалён', 'error');
+  } catch(e) {}
+};
+
+// Load settings from backend on startup
+(async function loadSettings() {
+  try {
+    const r = await fetch(API_URL + '/settings', { headers: { 'X-User-Id': window.userId } });
+    if (r.ok) {
+      const d = await r.json();
+      if (d.notifications) Object.assign(_localNotifSettings, d.notifications);
+      if (d.team)          _teamMembers = d.team;
+    }
+  } catch(e) { console.warn('Settings load:', e); }
+})();
+
+console.log('✅ Tags (chips), Settings panel, Team management, Per-task notify loaded');
+</script>
 </body>
 </html>
