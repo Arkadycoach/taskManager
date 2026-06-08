@@ -51,7 +51,10 @@ SCOPES = [
 
 COLUMNS = [
     "ID", "Title", "Description", "Status", "Priority",
-    "Deadline", "Assignee", "UserID", "UserName", "CreatedAt", "UpdatedAt", "CompletedAt"
+    "Deadline", "Assignee", "UserID", "UserName", "CreatedAt", "UpdatedAt",
+    "CompletedAt",   # col 12 (index 11)
+    "Tags",          # col 13 (index 12) — comma-separated: "work,client,urgent"
+    "Recurrence",    # col 14 (index 13) — none/daily/weekly/monthly/yearly
 ]
 
 STATUS_RU   = {"todo": "Новая",   "doing": "В работе", "done": "Готово"}
@@ -95,7 +98,9 @@ def row_to_task(row: list) -> dict:
         "deadline": g(5), "assignee": g(6),
         "user_id": g(7), "user_name": g(8),
         "created_at": g(9), "updated_at": g(10),
-        "completed_at": g(11),   # ← дата выполнения
+        "completed_at": g(11),
+        "tags":          [t.strip() for t in g(12).split(',') if t.strip()],
+        "recurrence":    g(13) or "none",
     }
 
 def get_all_tasks():
@@ -166,12 +171,14 @@ class TaskCreate(BaseModel):
     title: str; description: str = ""; status: str = "todo"
     priority: str = "medium"; deadline: str = ""; assignee: str = ""
     user_id: str = ""; user_name: str = ""
+    tags: list = []; recurrence: str = "none"
 
 class TaskUpdate(BaseModel):
     title: Optional[str] = None; description: Optional[str] = None
     status: Optional[str] = None; priority: Optional[str] = None
     deadline: Optional[str] = None; assignee: Optional[str] = None
     user_id: str = ""; user_name: str = ""
+    tags: Optional[list] = None; recurrence: Optional[str] = None
 
 class SubtaskCreate(BaseModel):
     title: str; user_id: str = ""
@@ -197,10 +204,12 @@ async def create_task(task: TaskCreate, x_user_id: str = Header(default="")):
         tid = str(uuid.uuid4())[:8].upper()
         now = datetime.now().isoformat(timespec="seconds")
         uid = task.user_id or x_user_id
+        tags_str = ",".join(task.tags) if task.tags else ""
         s.append_row([tid, task.title, task.description,
                       STATUS_RU.get(task.status, task.status),
                       PRIO_RU.get(task.priority, task.priority),
-                      task.deadline, task.assignee, uid, task.user_name, now, now, ""])
+                      task.deadline, task.assignee, uid, task.user_name, now, now,
+                      "", tags_str, task.recurrence or "none"])
         new = {"id":tid,"title":task.title,"description":task.description,"status":task.status,
                "priority":task.priority,"deadline":task.deadline,"assignee":task.assignee,
                "user_id":uid,"user_name":task.user_name,"created_at":now,"updated_at":now}
@@ -226,6 +235,10 @@ async def update_task(tid: str, upd: TaskUpdate, x_user_id: str = Header(default
         if upd.priority    is not None: s.update_cell(idx,5,PRIO_RU.get(upd.priority,upd.priority)); old["priority"]!=upd.priority and changes.append(f"Приоритет → {PRIO_RU.get(upd.priority)}")
         if upd.deadline    is not None: s.update_cell(idx,6,upd.deadline);         old["deadline"]!=upd.deadline and changes.append(f"Дедлайн → {upd.deadline or 'убран'}")
         if upd.assignee    is not None: s.update_cell(idx,7,upd.assignee);         old["assignee"]!=upd.assignee and changes.append(f"Исполнитель → {upd.assignee or '—'}")
+        if upd.tags        is not None:
+            tags_str = ",".join(upd.tags)
+            s.update_cell(idx,13,tags_str)
+        if upd.recurrence  is not None: s.update_cell(idx,14,upd.recurrence)
         now = datetime.now().isoformat(timespec="seconds"); s.update_cell(idx,11,now)
 
         # ✅ Записываем дату выполнения
@@ -242,6 +255,34 @@ async def update_task(tid: str, upd: TaskUpdate, x_user_id: str = Header(default
         if upd.status == "done" and old["status"] != "done":
             updated["completed_at"] = now
             await _notify("done", updated)
+            # ── ПОВТОРЯЮЩИЕСЯ ЗАДАЧИ ────────────────────────
+            rec = upd.recurrence or old.get("recurrence","none")
+            if rec and rec != "none":
+                next_dl = _next_deadline(old.get("deadline",""), rec)
+                if next_dl:
+                    next_id  = str(uuid.uuid4())[:8].upper()
+                    tags_str = ",".join(old.get("tags", []))
+                    s.append_row([
+                        next_id,
+                        old["title"],
+                        old["description"],
+                        STATUS_RU["todo"],
+                        PRIO_RU.get(old["priority"], old["priority"]),
+                        next_dl,
+                        old["assignee"],
+                        old["user_id"],
+                        old["user_name"],
+                        now, now, "",
+                        tags_str, rec,
+                    ])
+                    await _notify("create", {
+                        **old,
+                        "id": next_id,
+                        "status": "todo",
+                        "deadline": next_dl,
+                        "completed_at": "",
+                    })
+                    logger.info(f"♻️  Повторяющаяся задача создана: {old['title']} → {next_dl}")
         return {"success": True}
     except HTTPException: raise
     except Exception as e:
@@ -902,6 +943,162 @@ async def check_sheet_changes():
 # ══════════════════════════════════════════════════════════
 # DAILY REMINDERS
 # ══════════════════════════════════════════════════════════
+# Трекер отправленных напоминаний — избегаем дублей
+_sent: dict[str, datetime] = {}
+
+def _can_send(key: str, hours: int = 20) -> bool:
+    """True если напоминание по этому ключу ещё не отправлялось hours часов."""
+    if key in _sent and datetime.now() - _sent[key] < timedelta(hours=hours):
+        return False
+    _sent[key] = datetime.now()
+    return True
+
+async def send_daily_reminders():
+    while True:
+        now = datetime.now()
+
+        # ── Утренний дайджест 9:00 ────────────────────────
+        if now.hour == 9 and now.minute < 5:
+            await _send_morning_digest()
+            await asyncio.sleep(60 * 10)
+
+        # ── Напоминание о завтрашних дедлайнах 20:00 ─────
+        elif now.hour == 20 and now.minute < 5:
+            await _send_tomorrow_reminders()
+            await asyncio.sleep(60 * 10)
+
+        # ── Застрявшие задачи (в работе 3+ дней) 10:00 ───
+        elif now.hour == 10 and now.minute in range(0, 5):
+            await _send_stale_reminders()
+            await asyncio.sleep(60 * 10)
+
+        # ── Еженедельный итог пятница 18:00 ───────────────
+        elif now.weekday() == 4 and now.hour == 18 and now.minute < 5:
+            await _send_weekly_summary()
+            await asyncio.sleep(60 * 10)
+
+        else:
+            await asyncio.sleep(60)  # проверяем каждую минуту
+
+async def _send_morning_digest():
+    chat_id = _get_notify_chat_id()
+    if not chat_id: return
+    try:
+        tasks    = get_all_tasks()
+        today    = date.today()
+        overdue  = [t for t in tasks if t["deadline"] and t["status"]!="done" and _safe_date(t["deadline"])<today]
+        td_list  = [t for t in tasks if t["deadline"] and t["status"]!="done" and _safe_date(t["deadline"])==today]
+        upcoming = [t for t in tasks if t["deadline"] and t["status"]!="done"
+                    and today < _safe_date(t["deadline"]) <= today+timedelta(days=3)]
+        if not overdue and not td_list and not upcoming: return
+        ds  = today.strftime("%d.%m.%Y")
+        msg = "*" + ds + " — Доброе утро!*\n"
+        if overdue:
+            msg += "\n*Просрочено (" + str(len(overdue)) + "):\n"
+            for t in overdue[:5]: msg += "  • " + t["title"] + " _" + t["deadline"] + "_\n"
+        if td_list:
+            msg += "\n*Сегодня (" + str(len(td_list)) + "):\n"
+            for t in td_list:
+                tags = " ".join("#"+tg for tg in t.get("tags",[]))
+                msg += "  • " + t["title"] + (" " + tags if tags else "") + "\n"
+        if upcoming:
+            msg += "\n*Ближайшие 3 дня (" + str(len(upcoming)) + "):\n"
+            for t in upcoming[:5]: msg += "  • " + t["title"] + " _" + t["deadline"] + "_\n"
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("Задачи", callback_data="m:tasks"),
+             InlineKeyboardButton("Просроч.", callback_data="m:overdue")],
+            [InlineKeyboardButton("Открыть", url=WEBAPP_URL)],
+        ])
+        await bot.send_message(chat_id, msg, parse_mode="Markdown", reply_markup=kb)
+    except Exception as e: logger.error("_send_morning_digest: "+str(e))
+
+
+async def _send_tomorrow_reminders():
+    chat_id = _get_notify_chat_id()
+    if not chat_id: return
+    try:
+        tasks    = get_all_tasks()
+        tomorrow = date.today() + timedelta(days=1)
+        due_tmrw = [t for t in tasks if t["deadline"] and t["status"]!="done"
+                    and _safe_date(t["deadline"])==tomorrow]
+        if not due_tmrw: return
+        if not _can_send("tomorrow_"+tomorrow.isoformat(), hours=20): return
+        msg = "*Дедлайн завтра (" + str(len(due_tmrw)) + " задач):\n\n"
+        for t in due_tmrw:
+            icon = "⚡" if t["status"]=="doing" else "○"
+            tags = " ".join("#"+tg for tg in t.get("tags",[]))
+            msg += icon+" *"+t["title"]+"*"+(" "+tags if tags else "")+"\n"
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("Посмотреть", callback_data="m:today"),
+             InlineKeyboardButton("Открыть", url=WEBAPP_URL)],
+        ])
+        await bot.send_message(chat_id, msg, parse_mode="Markdown", reply_markup=kb)
+    except Exception as e: logger.error("_send_tomorrow_reminders: "+str(e))
+
+
+async def _send_stale_reminders():
+    chat_id = _get_notify_chat_id()
+    if not chat_id: return
+    try:
+        tasks  = get_all_tasks()
+        cutoff = datetime.now() - timedelta(days=3)
+        stale  = []
+        for t in tasks:
+            if t["status"]=="doing":
+                try:
+                    if datetime.fromisoformat(t.get("updated_at","")) < cutoff: stale.append(t)
+                except Exception: pass
+        if not stale: return
+        if not _can_send("stale_"+date.today().isoformat(), hours=20): return
+        msg = "*Застряли в работе (3+ дней):\n\n"
+        for t in stale[:7]:
+            upd = t.get("updated_at","")[:10]
+            msg += "  • *"+t["title"]+"* _(с "+upd+")_\n"
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("К задачам", callback_data="m:tasks"),
+             InlineKeyboardButton("Открыть", url=WEBAPP_URL)],
+        ])
+        await bot.send_message(chat_id, msg, parse_mode="Markdown", reply_markup=kb)
+    except Exception as e: logger.error("_send_stale_reminders: "+str(e))
+
+
+async def _send_weekly_summary():
+    chat_id = _get_notify_chat_id()
+    if not chat_id: return
+    try:
+        if not _can_send("weekly_"+date.today().isoformat(), hours=20): return
+        tasks    = get_all_tasks()
+        today    = date.today()
+        week_ago = today - timedelta(days=7)
+        next_wk  = today + timedelta(days=7)
+        done_wk  = [t for t in tasks if t["status"]=="done"
+                    and week_ago <= _safe_date(t.get("completed_at") or t.get("updated_at","")) <= today]
+        active   = [t for t in tasks if t["status"]!="done"]
+        due_nxt  = [t for t in tasks if t["deadline"] and t["status"]!="done"
+                    and today < _safe_date(t["deadline"]) <= next_wk]
+        total    = len(tasks)
+        done_all = len([t for t in tasks if t["status"]=="done"])
+        pct      = round(done_all/total*100) if total else 0
+        bar      = "█"*round(pct/10) + "░"*(10-round(pct/10))
+        msg  = "*Итоги недели*\n\n"
+        msg += "[" + bar + "] *" + str(pct) + "%* завершено\n\n"
+        msg += "✅ Выполнено за неделю: *" + str(len(done_wk)) + "*\n"
+        msg += "⚡ Сейчас в работе: *" + str(len(active)) + "*\n"
+        if due_nxt:
+            msg += "\n*На следующей неделе:*\n"
+            for t in due_nxt[:5]: msg += "  • "+t["title"]+" _"+t["deadline"]+"_\n"
+        if done_wk:
+            msg += "\n*Выполнено на этой неделе:*\n"
+            for t in done_wk[:5]: msg += "  ✓ "+t["title"]+"\n"
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("Статистика", callback_data="m:stats"),
+             InlineKeyboardButton("Открыть", url=WEBAPP_URL)],
+        ])
+        await bot.send_message(chat_id, msg, parse_mode="Markdown", reply_markup=kb)
+    except Exception as e: logger.error("_send_weekly_summary: "+str(e))
+
+
+
 async def send_daily_reminders():
     while True:
         now   = datetime.now()
@@ -995,6 +1192,34 @@ async def telegram_webhook(token: str, request: Request):
     update = Update.de_json(data, bot)
     await _tg_app.process_update(update)
     return {"ok": True}
+
+import calendar as _cal
+
+def _next_deadline(deadline: str, recurrence: str) -> str:
+    """Вычислить следующий дедлайн для повторяющейся задачи."""
+    if not deadline or recurrence in ("none", "", None):
+        return ""
+    try:
+        from datetime import date, timedelta
+        d     = date.fromisoformat(deadline)
+        today = date.today()
+        if recurrence == "daily":
+            while d <= today: d += timedelta(days=1)
+        elif recurrence == "weekly":
+            while d <= today: d += timedelta(weeks=1)
+        elif recurrence == "monthly":
+            while d <= today:
+                m   = d.month + 1 if d.month < 12 else 1
+                y   = d.year if d.month < 12 else d.year + 1
+                day = min(d.day, _cal.monthrange(y, m)[1])
+                d   = d.replace(year=y, month=m, day=day)
+        elif recurrence == "yearly":
+            while d <= today:
+                d = d.replace(year=d.year + 1)
+        return d.isoformat()
+    except Exception as e:
+        logger.warning(f"_next_deadline error: {e}")
+        return ""
 
 def _log(uid, uname, action, tid, title, changes):
     try:
