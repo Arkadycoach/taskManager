@@ -113,6 +113,99 @@ def get_all_tasks():
 # ══════════════════════════════════════════════════════════
 _chat_ids: dict[str, int] = {}   # user_id → chat_id (in-memory cache)
 
+# ── Кэш настроек уведомлений ──────────────────────────────
+_notif_settings: dict = {
+    "morning":  True,   # Утренний дайджест 9:00
+    "tomorrow": True,   # Дедлайны завтра 20:00
+    "stale":    True,   # Застрявшие задачи 10:00
+    "weekly":   True,   # Итоги недели пятница 18:00
+    "on_create": True,  # При создании задачи
+    "on_done":   True,  # При выполнении
+    "on_update": False, # При изменении (часто = спам)
+}
+
+# ── Кэш команды ───────────────────────────────────────────
+_team_members: list = []   # [{"name":..,"telegram_id":..,"username":..}]
+
+def _load_settings():
+    """Загрузить настройки и команду из Sheets при старте."""
+    try:
+        s    = get_sheet(SETTINGS_SHEET)
+        rows = s.get_all_values()
+        for row in rows[1:]:
+            if not row or len(row) < 2: continue
+            key, val = row[0], row[1]
+            if key.startswith("notif_"):
+                setting = key[6:]   # "notif_morning" → "morning"
+                if setting in _notif_settings:
+                    _notif_settings[setting] = val.lower() in ("true","1","yes")
+            elif key.startswith("team_"):
+                try:
+                    import json as _json
+                    member = _json.loads(val)
+                    if member not in _team_members:
+                        _team_members.append(member)
+                except Exception:
+                    pass
+        logger.info(f"Settings loaded: {_notif_settings}")
+        logger.info(f"Team members: {len(_team_members)}")
+    except Exception as e:
+        logger.warning(f"_load_settings: {e}")
+
+def _save_setting(key: str, value):
+    """Сохранить одну настройку в Sheets."""
+    try:
+        import json as _json
+        s    = get_sheet(SETTINGS_SHEET)
+        rows = s.get_all_values()
+        full_key = "notif_" + key if not key.startswith(("notif_","team_","chat_")) else key
+        str_val  = "true" if value is True else ("false" if value is False else str(value))
+        for i, row in enumerate(rows[1:], start=2):
+            if row and row[0] == full_key:
+                s.update_cell(i, 2, str_val)
+                return
+        s.append_row([full_key, str_val])
+    except Exception as e:
+        logger.warning(f"_save_setting: {e}")
+
+def _save_team_member(member: dict):
+    import json as _json
+    key = "team_" + member.get("username","").replace("@","")
+    _team_members.append(member)
+    try:
+        s    = get_sheet(SETTINGS_SHEET)
+        rows = s.get_all_values()
+        for i, row in enumerate(rows[1:], start=2):
+            if row and row[0] == key:
+                s.update_cell(i, 2, _json.dumps(member, ensure_ascii=False))
+                return
+        s.append_row([key, _json.dumps(member, ensure_ascii=False)])
+    except Exception as e:
+        logger.warning(f"_save_team_member: {e}")
+
+def _remove_team_member(username: str):
+    global _team_members
+    uname = username.replace("@","").lower()
+    _team_members = [m for m in _team_members if m.get("username","").replace("@","").lower() != uname]
+    try:
+        s    = get_sheet(SETTINGS_SHEET)
+        rows = s.get_all_values()
+        key  = "team_" + uname
+        for i, row in enumerate(rows[1:], start=2):
+            if row and row[0] == key:
+                s.delete_rows(i); return
+    except Exception as e:
+        logger.warning(f"_remove_team_member: {e}")
+
+def _get_team_chat_id(username: str) -> Optional[int]:
+    """Найти Telegram chat_id участника команды по имени или username."""
+    uname = username.replace("@","").lower()
+    for m in _team_members:
+        if m.get("username","").replace("@","").lower() == uname:
+            try: return int(m["telegram_id"])
+            except: pass
+    return None
+
 def _save_chat_id(user_id: str, chat_id: int):
     """Сохранить в памяти и в Sheets."""
     _chat_ids[user_id] = chat_id
@@ -242,6 +335,18 @@ async def update_task(tid: str, upd: TaskUpdate, x_user_id: str = Header(default
         now = datetime.now().isoformat(timespec="seconds"); s.update_cell(idx,11,now)
 
         # ✅ Записываем дату выполнения
+        # Уведомляем исполнителя при назначении
+        if upd.assignee is not None and upd.assignee != old.get("assignee","") and upd.assignee:
+            assignee_chat_id = _get_team_chat_id(upd.assignee)
+            if assignee_chat_id and assignee_chat_id != _get_notify_chat_id():
+                try:
+                    msg = "*Тебе назначена задача!*\n\n*" + (upd.title or old["title"]) + "*"
+                    if old.get("deadline"): msg += "\n Дедлайн: " + old["deadline"]
+                    kb  = InlineKeyboardMarkup([[InlineKeyboardButton("Открыть", url=WEBAPP_URL)]])
+                    await bot.send_message(assignee_chat_id, msg, parse_mode="Markdown", reply_markup=kb)
+                except Exception as e:
+                    logger.warning("assignee notify: " + str(e))
+
         if upd.status == "done" and old["status"] != "done":
             s.update_cell(idx, 12, now)   # CompletedAt = now
         elif upd.status in ("todo","doing") and old["status"] == "done":
@@ -398,6 +503,42 @@ async def delete_comment(cid: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/settings")
+async def get_settings(x_user_id: str = Header(default="")):
+    """Вернуть настройки уведомлений и список команды."""
+    return {
+        "notifications": _notif_settings,
+        "team": _team_members,
+    }
+
+@app.post("/settings/notification")
+async def update_notification_setting(data: dict, x_user_id: str = Header(default="")):
+    """Обновить одну настройку уведомлений."""
+    key = data.get("key","")
+    val = data.get("value", True)
+    if key in _notif_settings:
+        _notif_settings[key] = bool(val)
+        _save_setting(key, bool(val))
+    return {"ok": True}
+
+@app.post("/settings/team")
+async def add_team_member_api(data: dict, x_user_id: str = Header(default="")):
+    """Добавить участника команды."""
+    name     = data.get("name","")
+    username = data.get("username","").replace("@","")
+    tg_id    = data.get("telegram_id")
+    if not name or not username or not tg_id:
+        raise HTTPException(status_code=400, detail="name, username, telegram_id required")
+    member = {"name": name, "username": username, "telegram_id": int(tg_id)}
+    _save_team_member(member)
+    return {"ok": True, "member": member}
+
+@app.delete("/settings/team/{username}")
+async def remove_team_member_api(username: str, x_user_id: str = Header(default="")):
+    """Удалить участника команды."""
+    _remove_team_member(username)
+    return {"ok": True}
+
 @app.post("/register")
 async def register_user(data: dict):
     uid = str(data.get("user_id",""))
@@ -421,6 +562,13 @@ async def health():
 # NOTIFICATIONS  ← FIX #2: используем MY_TELEGRAM_ID напрямую
 # ══════════════════════════════════════════════════════════
 async def _notify(event: str, task: dict, changes: list = None):
+    # Проверяем настройки — пользователь может отключить отдельные типы
+    if event == "create" and not _notif_settings.get("on_create", True): return
+    if event == "done"   and not _notif_settings.get("on_done",   True): return
+    if event == "update" and not _notif_settings.get("on_update", False): return
+    # Проверяем per-task флаг (если задача с notify=false — молчим)
+    if task.get("notify") is False: return
+
     chat_id = _get_notify_chat_id()
     if not chat_id:
         logger.warning("⚠️  Нет chat_id для уведомлений. "
@@ -546,6 +694,89 @@ def _main_menu_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("➕ Добавить задачу", callback_data="m:add")],
     ])
 
+
+NOTIF_LABELS = {
+    "morning":   "Утренний дайджест (9:00)",
+    "tomorrow":  "Дедлайны завтра (20:00)",
+    "stale":     "Застрявшие задачи (10:00)",
+    "weekly":    "Итоги недели (пт 18:00)",
+    "on_create": "Новые задачи",
+    "on_done":   "Выполненные задачи",
+    "on_update": "Изменения задач",
+}
+
+def _settings_kb() -> InlineKeyboardMarkup:
+    rows = []
+    for key, label in NOTIF_LABELS.items():
+        icon = "ON" if _notif_settings.get(key) else "OFF"
+        icon_sym = "\u2705" if _notif_settings.get(key) else "\u274c"
+        rows.append([InlineKeyboardButton(
+            icon_sym + " " + label,
+            callback_data="toggle:" + key
+        )])
+    rows.append([InlineKeyboardButton("\u2190 \u041d\u0430\u0437\u0430\u0434", callback_data="m:main")])
+    return InlineKeyboardMarkup(rows)
+
+async def cmd_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = str(update.effective_user.id)
+    _save_chat_id(uid, update.effective_chat.id)
+    await update.message.reply_text(
+        "*\u2699\ufe0f \u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438 \u0443\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u0439*\n\n"
+        "\u041d\u0430\u0436\u043c\u0438 \u0447\u0442\u043e\u0431\u044b \u0432\u043a\u043b/\u0432\u044b\u043a\u043b:",
+        parse_mode="Markdown",
+        reply_markup=_settings_kb()
+    )
+
+async def cmd_team(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = str(update.effective_user.id)
+    _save_chat_id(uid, update.effective_chat.id)
+    if not _team_members:
+        team_text = "\u041a\u043e\u043c\u0430\u043d\u0434\u0430 \u043f\u0443\u0441\u0442\u0430."
+    else:
+        lines = []
+        for m in _team_members:
+            lines.append("\u2022 *" + m.get("name","?") + "* @" + m.get("username","?") + " (ID: " + str(m.get("telegram_id","?")) + ")")
+        team_text = "\n".join(lines)
+    msg = "*\u041a\u043e\u043c\u0430\u043d\u0434\u0430:*\n\n" + team_text + "\n\n"
+    msg += "*\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0443\u0447\u0430\u0441\u0442\u043d\u0438\u043a\u0430:*\n"
+    msg += "`/addmember \u0418\u043c\u044f @username TelegramID`\n\n"
+    msg += "*\u041f\u0440\u0438\u043c\u0435\u0440:*\n"
+    msg += "`/addmember \u0418\u0432\u0430\u043d @ivan 123456789`\n\n"
+    msg += "\u0423\u0437\u043d\u0430\u0442\u044c \u0441\u0432\u043e\u0439 ID: @userinfobot"
+    await update.message.reply_text(msg, parse_mode="Markdown")
+
+async def cmd_addmember(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    args = context.args
+    if not args or len(args) < 3:
+        await update.message.reply_text(
+            "\u0424\u043e\u0440\u043c\u0430\u0442: `/addmember \u0418\u043c\u044f @username TelegramID`\n\n"
+            "\u041f\u0440\u0438\u043c\u0435\u0440: `/addmember \u0418\u0432\u0430\u043d @ivan 123456789`",
+            parse_mode="Markdown"
+        )
+        return
+    name    = args[0]
+    username= args[1].replace("@","")
+    try:
+        tg_id = int(args[2])
+    except ValueError:
+        await update.message.reply_text("\u041e\u0448\u0438\u0431\u043a\u0430: Telegram ID \u0434\u043e\u043b\u0436\u0435\u043d \u0431\u044b\u0442\u044c \u0446\u0438\u0444\u0440\u043e\u0439. \u0423\u0437\u043d\u0430\u0439 \u0447\u0435\u0440\u0435\u0437 @userinfobot")
+        return
+    member = {"name": name, "username": username, "telegram_id": tg_id}
+    _save_team_member(member)
+    await update.message.reply_text(
+        "\u2705 *" + name + "* (@" + username + ") \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d!\n\n"
+        "\u0422\u0435\u043f\u0435\u0440\u044c \u043f\u0440\u0438 \u043d\u0430\u0437\u043d\u0430\u0447\u0435\u043d\u0438\u0438 \u0437\u0430\u0434\u0430\u0447\u0438 \u0435\u043c\u0443 \u043f\u0440\u0438\u0434\u0435\u0442 \u0443\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u0435.",
+        parse_mode="Markdown"
+    )
+
+async def cmd_removemember(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("\u0424\u043e\u0440\u043c\u0430\u0442: `/removemember @username`", parse_mode="Markdown")
+        return
+    username = context.args[0].replace("@","")
+    _remove_team_member(username)
+    await update.message.reply_text("\u0423\u0447\u0430\u0441\u0442\u043d\u0438\u043a @" + username + " \u0443\u0434\u0430\u043b\u0451\u043d.")
+
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user    = update.effective_user
     chat_id = update.effective_chat.id
@@ -556,14 +787,17 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"✅ Зарегистрирован пользователь {uid} → chat_id {chat_id}")
 
     await bot.set_my_commands([
-        BotCommand("start",   "🏠 Главное меню"),
-        BotCommand("tasks",   "📋 Активные задачи"),
-        BotCommand("today",   "📅 Дедлайны сегодня"),
-        BotCommand("overdue", "🔴 Просроченные"),
-        BotCommand("add",     "➕ Добавить задачу"),
-        BotCommand("done",    "✅ Выполнить задачу"),
-        BotCommand("stats",   "📊 Статистика"),
-        BotCommand("help",    "❓ Помощь"),
+        BotCommand("start",        "Главное меню"),
+        BotCommand("tasks",        "Активные задачи"),
+        BotCommand("today",        "Дедлайны сегодня"),
+        BotCommand("overdue",      "Просроченные"),
+        BotCommand("add",          "Добавить задачу"),
+        BotCommand("done",         "Выполнить задачу"),
+        BotCommand("stats",        "Статистика"),
+        BotCommand("settings",     "Настройки уведомлений"),
+        BotCommand("team",         "Управление командой"),
+        BotCommand("addmember",    "Добавить участника"),
+        BotCommand("help",         "Помощь"),
     ])
 
     # Считаем статистику
@@ -869,6 +1103,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
         # ── Смена статуса ────────────────────────────────────
+        # ── Переключение настроек уведомлений ──────────────
+        elif data.startswith("toggle:"):
+            key = data[7:]
+            if key in _notif_settings:
+                _notif_settings[key] = not _notif_settings[key]
+                _save_setting(key, _notif_settings[key])
+            await q.edit_message_reply_markup(reply_markup=_settings_kb())
+
         elif data.startswith("s:"):
             parts      = data.split(":")
             new_status = parts[1]; tid = parts[2]
@@ -1143,8 +1385,9 @@ async def send_daily_reminders():
 # ══════════════════════════════════════════════════════════
 @app.on_event("startup")
 async def startup():
-    # 1. Загружаем chat_ids из Sheets
+    # 1. Загружаем chat_ids и настройки из Sheets
     _load_chat_ids()
+    _load_settings()
 
     # 2. Google Sheets
     try:
@@ -1177,15 +1420,19 @@ async def telegram_webhook(token: str, request: Request):
     global _tg_app
     if _tg_app is None:
         _tg_app = Application.builder().token(BOT_TOKEN).build()
-        _tg_app.add_handler(CommandHandler("start",   cmd_start))
-        _tg_app.add_handler(CommandHandler("menu",    cmd_start))
-        _tg_app.add_handler(CommandHandler("tasks",   cmd_tasks))
-        _tg_app.add_handler(CommandHandler("today",   cmd_today))
-        _tg_app.add_handler(CommandHandler("overdue", cmd_overdue))
-        _tg_app.add_handler(CommandHandler("add",     cmd_add))
-        _tg_app.add_handler(CommandHandler("done",    cmd_done))
-        _tg_app.add_handler(CommandHandler("stats",   cmd_stats))
-        _tg_app.add_handler(CommandHandler("help",    cmd_help))
+        _tg_app.add_handler(CommandHandler("start",        cmd_start))
+        _tg_app.add_handler(CommandHandler("menu",         cmd_start))
+        _tg_app.add_handler(CommandHandler("tasks",        cmd_tasks))
+        _tg_app.add_handler(CommandHandler("today",        cmd_today))
+        _tg_app.add_handler(CommandHandler("overdue",      cmd_overdue))
+        _tg_app.add_handler(CommandHandler("add",          cmd_add))
+        _tg_app.add_handler(CommandHandler("done",         cmd_done))
+        _tg_app.add_handler(CommandHandler("stats",        cmd_stats))
+        _tg_app.add_handler(CommandHandler("settings",     cmd_settings))
+        _tg_app.add_handler(CommandHandler("team",         cmd_team))
+        _tg_app.add_handler(CommandHandler("addmember",    cmd_addmember))
+        _tg_app.add_handler(CommandHandler("removemember", cmd_removemember))
+        _tg_app.add_handler(CommandHandler("help",         cmd_help))
         _tg_app.add_handler(CallbackQueryHandler(handle_callback))
         await _tg_app.initialize()
     data   = await request.json()
