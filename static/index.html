@@ -2571,6 +2571,225 @@ body {
 /* Cursor pointer на кликабельных элементах */
 .task-card { cursor: pointer; }
 
+
+/* ════════════════════════════════════════════════════════
+   RICH EDITOR — полный стиль
+════════════════════════════════════════════════════════ */
+
+/* Обёртка редактора */
+.editor-wrap {
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface);
+  transition: border-color .2s;
+}
+.editor-wrap:focus-within {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--blue-soft);
+}
+
+/* Тулбар */
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 6px 8px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+/* Кнопки тулбара */
+.tb-btn {
+  width: 30px;
+  height: 28px;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .13s;
+  font-family: inherit;
+  flex-shrink: 0;
+}
+.tb-btn:hover  { background: var(--surface3); color: var(--text); }
+.tb-btn:active { background: var(--blue-soft); color: var(--blue); transform: scale(.92); }
+.tb-btn.active { background: var(--blue-soft); color: var(--blue); }
+.tb-btn b, .tb-btn i, .tb-btn s { font-size: 13px; }
+
+/* Разделитель */
+.tb-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 3px;
+  flex-shrink: 0;
+}
+
+/* Голосовая кнопка */
+.tb-btn.voice-btn       { color: var(--muted); }
+.tb-btn.voice-btn.recording {
+  background: var(--red-soft);
+  color: var(--red);
+  animation: pulse-red 1s ease-in-out infinite;
+}
+@keyframes pulse-red {
+  0%, 100% { box-shadow: none; }
+  50%       { box-shadow: 0 0 0 4px color-mix(in srgb, var(--red) 20%, transparent); }
+}
+
+/* Поле ввода */
+.editor-body {
+  min-height: 90px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--text);
+  outline: none;
+  word-break: break-word;
+  -webkit-user-modify: read-write-plaintext-only;
+}
+.editor-body:empty::before {
+  content: attr(data-ph);
+  color: var(--muted2);
+  pointer-events: none;
+  font-weight: 400;
+}
+.editor-body ul, .editor-body ol {
+  padding-left: 22px;
+  margin: 4px 0;
+}
+.editor-body li { margin: 2px 0; line-height: 1.65; }
+.editor-body a  { color: var(--blue); text-decoration: underline; }
+.editor-body img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin: 6px 0;
+  display: block;
+}
+
+/* Чеклист */
+.editor-body input[type=checkbox] {
+  width: 15px;
+  height: 15px;
+  margin-right: 6px;
+  accent-color: var(--blue);
+  cursor: pointer;
+}
+.editor-body .checklist-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 3px 0;
+}
+
+/* Прикреплённые файлы */
+.attached-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px 6px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text2);
+  margin: 4px 0;
+  max-width: 100%;
+  word-break: break-all;
+}
+.attached-file .file-icon { font-size: 16px; flex-shrink: 0; }
+
+/* Link dialog — скрыт по умолчанию */
+.link-dialog {
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--surface);
+  border: 1.5px solid var(--blue);
+  border-radius: 12px;
+  position: absolute;
+  z-index: 20;
+  left: 0; right: 0; top: 42px;
+  box-shadow: var(--shadow-lg);
+}
+.link-dialog.open { display: flex; }
+.link-dialog input {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 11px;
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  background: var(--surface2);
+  color: var(--text);
+}
+.link-dialog input:focus { border-color: var(--blue); }
+.link-dialog-btns {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.ldb-cancel {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--muted);
+}
+.ldb-ok {
+  background: var(--blue);
+  border: none;
+  border-radius: 8px;
+  padding: 7px 16px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  color: #fff;
+}
+
+/* Голосовой транскрипт-тост */
+.voice-toast {
+  position: fixed;
+  bottom: 160px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--red);
+  color: #fff;
+  padding: 8px 18px;
+  border-radius: 99px;
+  font-size: 13px;
+  font-weight: 700;
+  z-index: 300;
+  display: none;
+  align-items: center;
+  gap: 8px;
+  box-shadow: var(--shadow-lg);
+  white-space: nowrap;
+}
+.voice-toast.show { display: flex; }
+.voice-dot {
+  width: 8px; height: 8px;
+  background: #fff;
+  border-radius: 50%;
+  animation: blink .8s ease-in-out infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+
 </style>
   <meta name="app-version" content="202606060219">
   <script>
@@ -2757,8 +2976,12 @@ body {
         <label class="form-label">Название *</label>
         <input class="form-input" id="taskTitle" placeholder="Что нужно сделать?" autocomplete="off">
       </div>
-      <div class="form-group" style="position:relative">
-        <label class="form-label">Описание</label>
+      <div class="form-group">
+        <label class="form-label" style="display:flex;align-items:center;gap:6px">
+          Описание
+          <span style="font-size:10px;color:var(--muted2);font-weight:500">☑ чеклист &nbsp;•&nbsp; 📎 файл &nbsp;•&nbsp; 🖼 фото &nbsp;•&nbsp; 🎤 голос</span>
+        </label>
+        <div style="position:relative">
         <div class="link-dialog" id="linkDialog">
           <input type="text" id="linkUrl"  placeholder="URL (https://...)" autocomplete="off">
           <input type="text" id="linkText" placeholder="Текст ссылки" autocomplete="off">
@@ -2769,14 +2992,20 @@ body {
         </div>
         <div class="editor-wrap" id="editorWrap">
           <div class="editor-toolbar">
-            <button class="tb-btn" onmousedown="event.preventDefault();window.RichEditor?.execFormat('bold')" title="Жирный"><b>B</b></button>
-            <button class="tb-btn" onmousedown="event.preventDefault();window.RichEditor?.execFormat('italic')" title="Курсив"><i>I</i></button>
-            <button class="tb-btn" onmousedown="event.preventDefault();window.RichEditor?.execFormat('strikeThrough')"><s style="font-style:normal">S</s></button>
+            <button class="tb-btn" onmousedown="event.preventDefault();window.RichEditor?.execFormat('bold')" title="Жирный (Ctrl+B)"><b style="font-size:14px">B</b></button>
+            <button class="tb-btn" onmousedown="event.preventDefault();window.RichEditor?.execFormat('italic')" title="Курсив (Ctrl+I)"><i style="font-size:14px">I</i></button>
+            <button class="tb-btn" onmousedown="event.preventDefault();window.RichEditor?.execFormat('strikeThrough')" title="Зачёркнутый"><s style="font-style:normal;font-size:13px">S</s></button>
             <div class="tb-sep"></div>
-            <button class="tb-btn" onmousedown="event.preventDefault();window.RichEditor?.insertChecklist()">☑</button>
-            <button class="tb-btn" onmousedown="event.preventDefault();window.RichEditor?.execFormat('insertUnorderedList')">•</button>
-            <button class="tb-btn" onmousedown="event.preventDefault();window.RichEditor?.execFormat('insertOrderedList')">№</button>
+            <button class="tb-btn" onmousedown="event.preventDefault();window.RichEditor?.insertChecklist()" title="Чеклист (отмечаемые пункты)" style="font-size:15px">☑</button>
+            <button class="tb-btn" onmousedown="event.preventDefault();window.RichEditor?.execFormat('insertUnorderedList')" title="Маркированный список" style="font-size:16px">•</button>
+            <button class="tb-btn" onmousedown="event.preventDefault();window.RichEditor?.execFormat('insertOrderedList')" title="Нумерованный список" style="font-size:12px;font-weight:800">1.</button>
             <div class="tb-sep"></div>
+            <button class="tb-btn" title="Прикрепить файл" onclick="document.getElementById('fileInput').click()" style="font-size:16px">📎</button>
+            <button class="tb-btn" title="Вставить картинку" onclick="document.getElementById('imgFileInput').click()" style="font-size:15px">🖼</button>
+            <button class="tb-btn" onmousedown="event.preventDefault();window.RichEditor?.openLinkDialog()" title="Добавить ссылку" style="font-size:15px">🔗</button>
+            <div class="tb-sep"></div>
+            <button class="tb-btn voice-btn" id="voiceInputBtn" title="Голосовой ввод" onclick="window.toggleVoiceInput()" style="font-size:16px">🎤</button>
+          </div>
             <button class="tb-btn" onmousedown="event.preventDefault();window.RichEditor?.openLinkDialog()">🔗</button>
             <button class="tb-btn" onmousedown="event.preventDefault();window.RichEditor?.insertImageUrl()">🖼</button>
             <button class="tb-btn" onclick="document.getElementById('imgFileInput').click()">📷</button>
@@ -2787,8 +3016,11 @@ body {
                onpaste="window.RichEditor?.handleEditorPaste(event)"></div>
         </div>
         <input type="file" id="imgFileInput" accept="image/*" style="display:none" onchange="window.RichEditor?.handleImageFile(this)">
-        <input type="file" id="fileInput"   style="display:none"                  onchange="window.RichEditor?.handleFileAttach(this)">
+        <input type="file" id="fileInput" multiple style="display:none" onchange="window.RichEditor?.handleFileAttach(this)">
+        </div><!-- /position:relative -->
       </div>
+      <!-- Голосовой статус-тост -->
+      <div class="voice-toast" id="voiceToast"><div class="voice-dot"></div><span id="voiceToastText">Говори...</span></div>
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Статус</label>
@@ -5645,6 +5877,12 @@ console.log('✅ All features loaded: dark mode, quick add, undo, priority cycle
   </div>
 </div>
 
+
+<!-- Voice input status -->
+<div class="voice-toast" id="voiceToast">
+  <div class="voice-dot"></div>
+  <span id="voiceToastText">Говори...</span>
+</div>
 <!-- ════════════ DARK MODE BUTTON in header ════════════ -->
 <!-- (injected via JS into header-right) -->
 
@@ -6149,6 +6387,155 @@ console.log('✅ Tags (chips), Settings panel, Team management, Per-task notify 
 })();
 
 console.log('✅ Performance patch applied: RAF batching, virtual list 60+, passive listeners, lazy subtasks');
+
+
+// ════════════════════════════════════════════════════════
+//  VOICE INPUT — Web Speech API
+// ════════════════════════════════════════════════════════
+(function initVoiceInput() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (!SpeechRecognition) {
+    // Скрываем кнопку если не поддерживается
+    document.addEventListener('DOMContentLoaded', () => {
+      const btn = document.getElementById('voiceInputBtn');
+      if (btn) btn.style.display = 'none';
+    });
+    return;
+  }
+
+  let recognition = null;
+  let _recording   = false;
+
+  window.toggleVoiceInput = function() {
+    if (_recording) {
+      _stopVoice();
+    } else {
+      _startVoice();
+    }
+  };
+
+  function _startVoice() {
+    const editor = document.getElementById('taskDesc');
+    if (!editor) return;
+
+    recognition = new SpeechRecognition();
+    recognition.lang            = 'ru-RU';
+    recognition.continuous      = true;
+    recognition.interimResults  = true;
+    recognition.maxAlternatives = 1;
+
+    let _lastFinal = '';
+
+    recognition.onstart = () => {
+      _recording = true;
+      const btn  = document.getElementById('voiceInputBtn');
+      const toast = document.getElementById('voiceToast');
+      if (btn)   btn.classList.add('recording');
+      if (toast) toast.classList.add('show');
+      window.tg?.HapticFeedback?.impactOccurred('medium');
+    };
+
+    recognition.onresult = (e) => {
+      let interim = '';
+      let final   = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const text = e.results[i][0].transcript;
+        if (e.results[i].isFinal) final += text + ' ';
+        else interim += text;
+      }
+
+      const toast = document.getElementById('voiceToast');
+      const toastText = document.getElementById('voiceToastText');
+
+      if (interim && toastText) {
+        toastText.textContent = interim;
+      }
+
+      if (final) {
+        _lastFinal += final;
+        // Вставляем текст в редактор
+        editor.focus();
+        document.execCommand('insertText', false, final);
+        if (toastText) toastText.textContent = 'Говори...';
+      }
+    };
+
+    recognition.onerror = (e) => {
+      console.warn('Voice error:', e.error);
+      _stopVoice();
+      if (e.error === 'not-allowed') {
+        window.showToast?.('Нет доступа к микрофону', 'error');
+      } else if (e.error === 'no-speech') {
+        window.showToast?.('Речь не распознана, попробуй снова', '');
+      }
+    };
+
+    recognition.onend = () => {
+      // Автоматически перезапускаем если пользователь не остановил
+      if (_recording) {
+        try { recognition.start(); } catch(e) { _stopVoice(); }
+      }
+    };
+
+    try {
+      recognition.start();
+    } catch(e) {
+      window.showToast?.('Голосовой ввод недоступен', 'error');
+    }
+  }
+
+  function _stopVoice() {
+    _recording = false;
+    recognition?.stop();
+    recognition = null;
+
+    const btn   = document.getElementById('voiceInputBtn');
+    const toast = document.getElementById('voiceToast');
+    if (btn)   btn.classList.remove('recording');
+    if (toast) toast.classList.remove('show');
+
+    window.tg?.HapticFeedback?.notificationOccurred('success');
+    window.showToast?.('✓ Голосовой ввод завершён', 'success');
+  }
+
+  // Останавливаем при закрытии модала
+  const origClose = window.ModalsModule?.close?.bind(window.ModalsModule);
+  if (window.ModalsModule && origClose) {
+    window.ModalsModule.close = function() {
+      if (_recording) _stopVoice();
+      origClose();
+    };
+  }
+
+  // Также stop по Escape
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && _recording) _stopVoice();
+  });
+
+  console.log('✅ Voice input (Web Speech API) initialized — lang: ru-RU');
+})();
+
+// ════════════════════════════════════════════════════════
+//  LINK DIALOG FIX — открывать через класс .open
+// ════════════════════════════════════════════════════════
+if (window.RichEditor) {
+  const origOpenLink  = window.RichEditor.openLinkDialog?.bind(window.RichEditor);
+  const origCloseLink = window.RichEditor.closeLinkDialog?.bind(window.RichEditor);
+
+  window.RichEditor.openLinkDialog = function() {
+    const d = document.getElementById('linkDialog');
+    if (d) d.classList.add('open');
+    document.getElementById('linkUrl')?.focus();
+    origOpenLink?.();
+  };
+
+  window.RichEditor.closeLinkDialog = function() {
+    const d = document.getElementById('linkDialog');
+    if (d) d.classList.remove('open');
+    origCloseLink?.();
+  };
+}
 
 </script>
 </body>
